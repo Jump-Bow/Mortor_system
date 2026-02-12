@@ -1,0 +1,394 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}系統日誌 - FEM 設備保養管理系統{% endblock %}
+
+{% block page_title %}系統日誌{% endblock %}
+
+{% block breadcrumb_active %}系統日誌{% endblock %}
+
+{% block extra_css %}
+<style>
+    .action-type-badge {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    .stats-card {
+        border-left: 3px solid;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Statistics Row -->
+<div class="row mb-3">
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-info stats-card">
+            <div class="inner">
+                <h3 id="stat-total-logs">0</h3>
+                <p>總操作數</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-success stats-card">
+            <div class="inner">
+                <h3 id="stat-active-users">0</h3>
+                <p>活躍使用者</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-users"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-warning stats-card">
+            <div class="inner">
+                <h3 id="stat-action-types">0</h3>
+                <p>操作類型</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-tags"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-danger stats-card">
+            <div class="inner">
+                <h3 id="stat-date-range">7</h3>
+                <p>統計天數</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-calendar"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Activity Chart -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">每日活動趨勢</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="activityChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Users -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">活躍使用者 (Top 10)</h3>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" id="top-users-list">
+                    <!-- Loaded via AJAX -->
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">系統日誌</h3>
+            </div>
+            <div class="card-body">
+                <!-- Filter Section -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label>操作類型</label>
+                        <select class="form-control" id="filter-action-type">
+                            <option value="">全部</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label>開始日期</label>
+                        <input type="date" class="form-control" id="filter-start-date">
+                    </div>
+                    <div class="col-md-2">
+                        <label>結束日期</label>
+                        <input type="date" id="filter-end-date" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label>搜尋</label>
+                        <input type="text" class="form-control" id="filter-search" placeholder="搜尋使用者或描述...">
+                    </div>
+                    <div class="col-md-2">
+                        <label>&nbsp;</label>
+                        <button type="button" class="btn btn-info btn-block" id="btn-search">
+                            <i class="fas fa-search"></i> 搜尋
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Logs Table -->
+                <table id="logs-table" class="table table-bordered table-hover table-sm">
+                    <thead>
+                        <tr>
+                            <th style="width: 180px">時間</th>
+                            <th style="width: 100px">使用者</th>
+                            <th style="width: 150px">操作類型</th>
+                            <th>描述</th>
+                            <th style="width: 120px">IP 位址</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data loaded via AJAX -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // DataTable
+    let table = null;
+    let activityChart = null;
+    
+    // Set default date range (last 7 days)
+    const today = new Date();
+    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    $('#filter-end-date').val(today.toISOString().split('T')[0]);
+    $('#filter-start-date').val(lastWeek.toISOString().split('T')[0]);
+    
+    // Load action types
+    function loadActionTypes() {
+        $.ajax({
+            url: '/api/system-logs/action-types',
+            method: 'GET',
+            success: function(response) {
+                if (response.status === 'success') {
+                    const actionTypes = response.data.action_types;
+                    
+                    $('#filter-action-type').html('<option value="">全部</option>');
+                    actionTypes.forEach(function(type) {
+                        $('#filter-action-type').append(
+                            `<option value="${type}">${type}</option>`
+                        );
+                    });
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '載入操作類型失敗');
+            }
+        });
+    }
+    
+    // Load statistics
+    function loadStats(days = 7) {
+        $.ajax({
+            url: '/api/system-logs/stats',
+            method: 'GET',
+            data: { days: days },
+            success: function(response) {
+                if (response.status === 'success') {
+                    const stats = response.data.stats;
+                    
+                    // Update stat cards
+                    $('#stat-total-logs').text(stats.total_logs.toLocaleString());
+                    $('#stat-active-users').text(stats.top_users.length);
+                    $('#stat-action-types').text(Object.keys(stats.by_action_type).length);
+                    $('#stat-date-range').text(days);
+                    
+                    // Render top users
+                    renderTopUsers(stats.top_users);
+                    
+                    // Render activity chart
+                    renderActivityChart(stats.daily_activity);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '載入統計資料失敗');
+            }
+        });
+    }
+    
+    // Render top users list
+    function renderTopUsers(topUsers) {
+        const list = $('#top-users-list');
+        list.empty();
+        
+        if (topUsers.length === 0) {
+            list.append('<li class="list-group-item text-muted">暫無資料</li>');
+            return;
+        }
+        
+        topUsers.forEach(function(item, index) {
+            const badge = index < 3 ? 'badge-warning' : 'badge-info';
+            list.append(`
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>
+                        <span class="badge ${badge} mr-2">${index + 1}</span>
+                        ${item.user_name}
+                    </span>
+                    <span class="badge badge-primary badge-pill">${item.count}</span>
+                </li>
+            `);
+        });
+    }
+    
+    // Render activity chart
+    function renderActivityChart(dailyActivity) {
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        
+        const labels = dailyActivity.map(item => item.date);
+        const data = dailyActivity.map(item => item.count);
+        
+        if (activityChart) {
+            activityChart.destroy();
+        }
+        
+        activityChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '操作次數',
+                    data: data,
+                    borderColor: 'rgb(60, 141, 188)',
+                    backgroundColor: 'rgba(60, 141, 188, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Get action type badge class
+    function getActionTypeBadge(actionType) {
+        const badgeMap = {
+            'WEB_LOGIN': 'badge-success',
+            'WEB_LOGOUT': 'badge-secondary',
+            'API_LOGIN': 'badge-info',
+            'USER_CREATE': 'badge-primary',
+            'USER_UPDATE': 'badge-warning',
+            'USER_DELETE': 'badge-danger',
+            'USER_PASSWORD_RESET': 'badge-warning',
+            'TASK_CREATE': 'badge-primary',
+            'TASK_UPDATE': 'badge-info',
+            'INSPECTION_SUBMIT': 'badge-success'
+        };
+        
+        return badgeMap[actionType] || 'badge-secondary';
+    }
+    
+    // Load logs
+    function loadLogs() {
+        const actionType = $('#filter-action-type').val();
+        const startDate = $('#filter-start-date').val();
+        const endDate = $('#filter-end-date').val();
+        const search = $('#filter-search').val();
+        
+        let params = {
+            per_page: 100
+        };
+        
+        if (actionType) params.action_type = actionType;
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
+        
+        $.ajax({
+            url: '/api/system-logs/list',
+            method: 'GET',
+            data: params,
+            success: function(response) {
+                if (response.status === 'success') {
+                    renderLogsTable(response.data.logs, search);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '載入系統日誌失敗');
+            }
+        });
+    }
+    
+    // Render logs table
+    function renderLogsTable(logs, searchTerm = '') {
+        if (table) {
+            table.destroy();
+        }
+        
+        const tbody = $('#logs-table tbody');
+        tbody.empty();
+        
+        logs.forEach(function(log) {
+            const createdAt = moment(log.created_at).format('YYYY-MM-DD HH:mm:ss');
+            const badgeClass = getActionTypeBadge(log.action_type);
+            
+            const row = `
+                <tr>
+                    <td><small>${createdAt}</small></td>
+                    <td>${log.user_name || '-'}</td>
+                    <td><span class="badge ${badgeClass} action-type-badge">${log.action_type}</span></td>
+                    <td><small>${log.action_description || '-'}</small></td>
+                    <td><small>${log.ip_address || '-'}</small></td>
+                </tr>
+            `;
+            tbody.append(row);
+        });
+        
+        // Initialize DataTable
+        table = $('#logs-table').DataTable({
+            language: {
+                url: '{{ url_for("static", filename="datatable_zh-Hant.json") }}'
+            },
+            order: [[0, 'desc']], // Sort by time
+            pageLength: 50,
+            search: {
+                search: searchTerm
+            }
+        });
+    }
+    
+    // Search button
+    $('#btn-search').click(function() {
+        loadLogs();
+    });
+    
+    // Search on Enter key
+    $('#filter-search').keypress(function(e) {
+        if (e.which === 13) {
+            loadLogs();
+        }
+    });
+    
+    // Initialize
+    loadActionTypes();
+    loadStats(7);
+    loadLogs();
+});
+</script>
+{% endblock %}

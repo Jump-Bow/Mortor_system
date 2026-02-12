@@ -1,0 +1,223 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}任務詳情 - FEM 設備保養管理系統{% endblock %}
+{% block page_title %}任務詳情{% endblock %}
+{% block breadcrumb_active %}任務詳情{% endblock %}
+
+{% block content %}
+<!-- 任務基本資訊 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">任務資訊</h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="window.location.href='/task/list'">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </button>
+                    <button type="button" class="btn btn-sm btn-warning" id="editTaskBtn">
+                        <i class="fas fa-edit"></i> 編輯
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">任務編號:</dt>
+                            <dd class="col-sm-8" id="task-number">-</dd>
+                            
+                            <dt class="col-sm-4">設備名稱:</dt>
+                            <dd class="col-sm-8" id="equipment-name">-</dd>
+                            
+                            <dt class="col-sm-4">檢查日期:</dt>
+                            <dd class="col-sm-8" id="inspection-date">-</dd>
+                            
+                            <dt class="col-sm-4">指派人員:</dt>
+                            <dd class="col-sm-8" id="assigned-user">-</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">任務狀態:</dt>
+                            <dd class="col-sm-8" id="task-status">-</dd>
+                            
+                            <dt class="col-sm-4">完成率:</dt>
+                            <dd class="col-sm-8">
+                                <div class="progress" style="height: 20px;">
+                                    <div id="completion-bar" class="progress-bar bg-success" role="progressbar" style="width: 0%">
+                                        <span id="completion-text">0%</span>
+                                    </div>
+                                </div>
+                            </dd>
+                            
+
+                            
+                            <dt class="col-sm-4">AIMS工單:</dt>
+                            <dd class="col-sm-8" id="aims-order">-</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 巡檢結果 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">巡檢結果</h3>
+            </div>
+            <div class="card-body">
+                <div id="results-accordion">
+                    <!-- 動態載入巡檢結果 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let taskId = "{{ task_id }}";
+let taskData = null;
+
+$(document).ready(function() {
+    loadTaskDetail();
+});
+
+function loadTaskDetail() {
+    $.ajax({
+        url: `/api/v1/tasks/${taskId}`,
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+        },
+        success: function(response) {
+            if (response.status === 'success') {
+                taskData = response.data.task;
+                displayTaskInfo();
+                displayResults();
+            }
+        },
+        error: function(xhr) {
+            if (xhr.status === 401) {
+                window.location.href = '/login';
+            } else if (xhr.status === 404) {
+                toastr.error('任務不存在');
+                setTimeout(() => {
+                    window.location.href = '/task/list';
+                }, 2000);
+            } else {
+                toastr.error('載入任務資料失敗');
+            }
+        }
+    });
+}
+
+function displayTaskInfo() {
+    $('#task-number').text(taskData.task_number || '-');
+    $('#equipment-name').text(taskData.equipment_name || '-');
+    
+    $('#inspection-date').text(taskData.inspection_date || '-');
+    $('#assigned-user').text(taskData.assigned_user_name || '未指派');
+    
+    // 狀態標籤
+    const statusBadges = {
+        'Pending': 'badge-secondary',
+        'InProgress': 'badge-info',
+        'Completed': 'badge-success'
+    };
+    const statusLabels = {
+        'Pending': '未派工',
+        'InProgress': '執行中',
+        'Completed': '已完成'
+    };
+    const statusBadge = statusBadges[taskData.status] || 'badge-secondary';
+    const statusLabel = statusLabels[taskData.status] || taskData.status || '-';
+    $('#task-status').html(`<span class="badge ${statusBadge}">${statusLabel}</span>`);
+    
+    // 完成率
+    const completionRate = taskData.completion_rate || 0;
+    $('#completion-bar').css('width', completionRate + '%');
+    $('#completion-text').text(completionRate.toFixed(1) + '%');
+    
+    // 時間
+
+    $('#aims-order').text(taskData.aims_order_id || '-');
+    
+    // 編輯按鈕事件
+    $('#editTaskBtn').click(function() {
+        window.location.href = `/task/${taskId}/edit`;
+    });
+}
+
+function displayResults() {
+    const resultsContainer = $('#results-accordion');
+    resultsContainer.empty();
+    
+    if (!taskData.results || taskData.results.length === 0) {
+        resultsContainer.html('<p class="text-muted">尚無巡檢結果</p>');
+        return;
+    }
+    
+    // 顯示結果 (不分組，因為一個任務對應一個設備)
+    const cardHtml = `
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cube"></i> ${taskData.equipment_name || '設備'} (${taskData.results.length} 項)
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th>檢查項目</th>
+                            <th>檢查值</th>
+                            <th>狀態</th>
+                            <th>檢查時間</th>
+                            <th>檢查員</th>
+                            <th>備註</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${taskData.results.map(result => createResultRow(result)).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    resultsContainer.append(cardHtml);
+}
+
+function createResultRow(result) {
+    const statusBadges = {
+        '正常': 'badge-success',
+        '異常': 'badge-danger',
+        '注意': 'badge-warning',
+        '備機': 'badge-info',
+        '檢修': 'badge-secondary',
+        '停機': 'badge-dark'
+    };
+    const statusBadge = statusBadges[result.result_status] || 'badge-secondary';
+    
+    return `
+        <tr class="${result.is_abnormal ? 'table-warning' : ''}">
+            <td>${result.item_description || '-'}</td>
+            <td>${result.result_value || '-'}</td>
+            <td><span class="badge ${statusBadge}">${result.result_status || '-'}</span></td>
+            <td>${result.check_time ? new Date(result.check_time).toLocaleString('zh-TW') : '-'}</td>
+            <td>${result.inspector_name || '-'}</td>
+            <td>
+                ${result.abnormal_reason || ''}
+                ${result.is_abnormal ? '<i class="fas fa-exclamation-triangle text-danger"></i>' : ''}
+            </td>
+        </tr>
+    `;
+}
+</script>
+{% endblock %}

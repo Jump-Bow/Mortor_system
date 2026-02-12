@@ -1,0 +1,82 @@
+# ==============================================================================
+# cloudbuild.yaml (最終版 - 無 Secret Manager 設定)
+# 部署至 Cloud Run，並透過 Direct VPC Egress 連接到 Shared VPC
+# ==============================================================================
+steps:
+  # ==============================================================================
+  # 步驟 1: 建置 Docker Image
+  # ==============================================================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build image'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - >
+        docker build -t ${_IMAGE_PATH}:${SHORT_SHA} .
+    # 已移除 secretEnv 區塊，因為不再從 Secret Manager 獲取密鑰
+
+  # ==============================================================================
+  # 步驟 2: 推送 Image
+  # 將 Image 推送到 cmc-devops 專案的 Artifact Registry
+  # ==============================================================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push image'
+    waitFor:
+      - 'Build image'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        docker push ${_IMAGE_PATH}:${SHORT_SHA}
+
+  # ==============================================================================
+  # 步驟 3: 部署到 Cloud Run
+  # 使用 Direct VPC Egress，指定 Shared VPC 的網路與子網路
+  # ==============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy to Cloud Run'
+    waitFor:
+      - 'Push image'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Deploying image ${_IMAGE_PATH}:${SHORT_SHA} to project [${_DEPLOY_PROJECT_ID}]"
+        echo "Connecting to Shared VPC Subnet: [${_VPC_SUBNET}]"
+
+        gcloud run deploy ${_DEPLOY_SERVICE_NAME} \
+          --image ${_IMAGE_PATH}:${SHORT_SHA} \
+          --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
+          --project "${_DEPLOY_PROJECT_ID}" \
+          --region ${_LOCATION} \
+          --platform "managed" \
+          --execution-environment "gen2" \
+          --network "${_VPC_NETWORK}" \
+          --subnet "${_VPC_SUBNET}" \
+          --vpc-egress "all-traffic" \
+          --allow-unauthenticated
+
+# ==============================================================================
+# 設定與環境變數
+# ==============================================================================
+timeout: 7200s
+
+substitutions:
+  _LOCATION: asia-east1
+
+  # --- 【部署目標設定】 ---
+  _DEPLOY_PROJECT_ID: 'prj-ai-intellipatrol-ip'
+  _DEPLOY_SERVICE_NAME: 'motor-server'
+  _DEPLOY_SERVICE_ACCOUNT: 'intellipatrol-app-IP-sa@prj-ai-intellipatrol-ip.iam.gserviceaccount.com'
+  # --- 【Shared VPC 網路設定】 ---
+  _HOST_PROJECT_ID: 'cmccloud01-hostproject'
+  _SHARED_VPC_NAME: 'hostproject-middleware-sharedvpc'
+  _SHARED_SUBNET_NAME: 'hostproject-sub77-serverless01'
+
+  # 自動組合完整的網路與子網路路徑
+  _VPC_NETWORK: 'projects/${_HOST_PROJECT_ID}/global/networks/${_SHARED_VPC_NAME}'
+  _VPC_SUBNET: 'projects/${_HOST_PROJECT_ID}/regions/${_LOCATION}/subnetworks/${_SHARED_SUBNET_NAME}'
+  # --- 【映像檔來源設定 (維持不變)】 ---
+  _IMAGE_PATH: asia-east1-docker.pkg.dev/cmc-devops/pd-repo/ai-motor-server-image
+
+# 已移除 availableSecrets 區塊

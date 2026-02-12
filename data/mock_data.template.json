@@ -1,0 +1,12 @@
+{
+  "_comment": "Mock 資料範本檔案 - 已簡化並符合 DB_RELATION.md 結構",
+  "_note": "此檔案已不再使用，所有測試資料現在直接在 init_db.py 中生成",
+  "users": [],
+  "roles": [],
+  "organizations": [],
+  "facilities": [],
+  "equipment": [],
+  "check_items": [],
+  "inspection_tasks": [],
+  "inspection_results": []
+}

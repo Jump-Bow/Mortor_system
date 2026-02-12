@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # FEM Admin Application
+  fem-admin:
+    build: .
+    container_name: fem-admin
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=run.py
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - PROD_DB_SERVER=postgres
+      - PROD_DB_PORT=5432
+      - PROD_DB_NAME=${PROD_DB_NAME:-fem_prod}
+      - PROD_DB_USER=${PROD_DB_USER:-fem_admin}
+      - PROD_DB_PASSWORD=${PROD_DB_PASSWORD}
+      - DEV_DB_TYPE=postgresql
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - fem-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: fem-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${PROD_DB_NAME:-fem_prod}
+      POSTGRES_USER: ${PROD_DB_USER:-fem_admin}
+      POSTGRES_PASSWORD: ${PROD_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - fem-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: fem-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - fem-network
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: fem-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - fem-admin
+    restart: unless-stopped
+    networks:
+      - fem-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+
+networks:
+  fem-network:
+    driver: bridge

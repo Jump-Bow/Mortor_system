@@ -1,0 +1,254 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}設施管理 - 樹狀結構{% endblock %}
+{% block page_title %}設施架構{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">首頁</a></li>
+<li class="breadcrumb-item active">設施架構</li>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/jstree/themes/default/style-3.3.15.min.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">設施樹狀結構</h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-tool" onclick="loadFacilityTree()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <select class="form-control select2" id="org-filter" onchange="loadFacilityTree()">
+                        <option value="">所有組織</option>
+                    </select>
+                </div>
+                <div id="facilityTree"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">設施資訊</h3>
+                <div class="card-tools" id="action-buttons" style="display: none;">
+                    <a href="#" id="btn-view-detail" class="btn btn-sm btn-info">
+                        <i class="fas fa-eye"></i> 詳細資料
+                    </a>
+                </div>
+            </div>
+            <div class="card-body" id="facilityInfo">
+                <div class="text-center text-muted">
+                    <i class="fas fa-building fa-3x"></i>
+                    <p class="mt-3">請從左側選擇設施查看詳細資訊</p>
+                </div>
+            </div>
+            <div class="card-body" id="facilityDetailContent" style="display: none;">
+                <table class="table table-bordered">
+                    <tr>
+                        <th style="width: 30%">設施名稱</th>
+                        <td id="detail-name"></td>
+                    </tr>
+                    <tr>
+                        <th>設施類型</th>
+                        <td id="detail-type"></td>
+                    </tr>
+                    <tr>
+                        <th>所屬組織</th>
+                        <td id="detail-org"></td>
+                    </tr>
+                    <tr>
+                        <th>上層設施</th>
+                        <td id="detail-parent"></td>
+                    </tr>
+                    <tr>
+                        <th>描述</th>
+                        <td id="detail-desc"></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card" id="equipmentCard" style="display: none;">
+            <div class="card-header">
+                <h3 class="card-title">關聯設備</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-hover" id="equipmentTable">
+                    <thead>
+                        <tr>
+                            <th>設備編號</th>
+                            <th>設備名稱</th>
+                            <th>狀態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='vendor/jstree/jstree-3.3.15.min.js') }}"></script>
+<script>
+let selectedFacilityId = null;
+const apiToken = $('meta[name="api-token"]').attr('content');
+
+$(document).ready(function() {
+    loadOrganizations();
+    loadFacilityTree();
+});
+
+function loadOrganizations() {
+    $.ajax({
+        url: '/api/v1/organizations/tree',
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + apiToken },
+        success: function(response) {
+            if (response.status === 'success') {
+                const select = $('#org-filter');
+                function addOptions(nodes, level) {
+                    nodes.forEach(function(node) {
+                        var prefix = level > 0 ? '&nbsp;&nbsp;'.repeat(level) + '└ ' : '';
+                        select.append(new Option(prefix + node.org_name, node.org_id));
+                        if (node.children && node.children.length > 0) {
+                            addOptions(node.children, level + 1);
+                        }
+                    });
+                }
+                addOptions(response.data.organizations, 0);
+            }
+        }
+    });
+}
+
+function loadFacilityTree() {
+    const orgId = $('#org-filter').val();
+    let url = '/api/v1/facilities/tree';
+    if (orgId) {
+        url += '?org_id=' + orgId;
+    }
+
+    $.ajax({
+        url: url,
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + apiToken },
+        success: function(response) {
+            if (response.status === 'success') {
+                buildTree(response.data.facilities);
+            }
+        },
+        error: function(xhr) {
+            toastr.error('載入設施架構失敗');
+        }
+    });
+}
+
+function buildTree(facilities) {
+    // Destroy existing tree if any
+    $('#facilityTree').jstree("destroy");
+
+    const treeData = convertToJsTreeFormat(facilities);
+    
+    $('#facilityTree').jstree({
+        'core': {
+            'data': treeData,
+            'themes': {
+                'icons': true
+            }
+        },
+        'plugins': ['search', 'types'],
+        'types': {
+            'Plant': { 'icon': 'fas fa-industry' },
+            'Building': { 'icon': 'fas fa-building' },
+            'Floor': { 'icon': 'fas fa-layer-group' },
+            'Area': { 'icon': 'fas fa-vector-square' },
+            'Room': { 'icon': 'fas fa-server' },
+            'Route': { 'icon': 'fas fa-route' },
+            'default': { 'icon': 'fas fa-cube' }
+        }
+    }).on('select_node.jstree', function(e, data) {
+        selectedFacilityId = data.node.id;
+        showFacilityDetails(data.node.original.facility_data);
+    });
+}
+
+function convertToJsTreeFormat(nodes) {
+    return nodes.map(node => {
+        return {
+            id: node.facility_id,
+            text: node.facility_name + ' (' + node.facility_type + ')',
+            type: node.facility_type,
+            state: { opened: true },
+            children: node.children ? convertToJsTreeFormat(node.children) : [],
+            facility_data: node // Store full data for easy access
+        };
+    });
+}
+
+function showFacilityDetails(data) {
+    $('#facilityInfo').hide();
+    $('#facilityDetailContent').show();
+    $('#action-buttons').show();
+    $('#equipmentCard').show();
+    
+    $('#detail-name').text(data.facility_name);
+    $('#detail-type').html('<span class="badge badge-info">' + data.facility_type + '</span>');
+    $('#detail-org').text(data.org_name || '-');
+    $('#detail-parent').text(data.parent_facility_id || '-'); // Ideally fetch parent name
+    $('#detail-desc').text(data.description || '-');
+    
+    $('#btn-view-detail').attr('href', '/facility/' + data.facility_id);
+    
+    // Load equipment for this facility
+    loadEquipment(data.facility_id);
+}
+
+function loadEquipment(facilityId) {
+    // Placeholder for equipment loading logic
+    // Assuming there might be an endpoint or we use the facility detail endpoint which includes equipment
+    // For now, clear table
+    const tbody = $('#equipmentTable tbody');
+    tbody.empty();
+    tbody.append('<tr><td colspan="4" class="text-center">載入中...</td></tr>');
+    
+    $.ajax({
+        url: '/api/v1/facilities/' + facilityId,
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + apiToken },
+        success: function(response) {
+            tbody.empty();
+            if (response.status === 'success' && response.data.equipment && response.data.equipment.length > 0) {
+                response.data.equipment.forEach(eq => {
+                    tbody.append(`
+                        <tr>
+                            <td>${eq.equipment_id}</td>
+                            <td>${eq.equipment_name}</td>
+                            <td><span class="badge badge-${eq.status === 'active' ? 'success' : 'secondary'}">${eq.status}</span></td>
+                            <td>
+                                <a href="#" class="btn btn-xs btn-default"><i class="fas fa-search"></i></a>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } else {
+                tbody.append('<tr><td colspan="4" class="text-center text-muted">無關聯設備</td></tr>');
+            }
+        },
+        error: function() {
+            tbody.html('<tr><td colspan="4" class="text-center text-danger">載入失敗</td></tr>');
+        }
+    });
+}
+</script>
+{% endblock %}

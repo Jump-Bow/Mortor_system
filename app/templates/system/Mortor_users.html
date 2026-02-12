@@ -1,0 +1,475 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}使用者管理 - FEM 設備保養管理系統{% endblock %}
+
+{% block page_title %}使用者管理{% endblock %}
+
+{% block breadcrumb_active %}使用者管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+    }
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">使用者列表</h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-add-user">
+                        <i class="fas fa-plus"></i> 新增使用者
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Filter Section -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label>角色</label>
+                        <select class="form-control" id="filter-role">
+                            <option value="">全部</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label>狀態</label>
+                        <select class="form-control" id="filter-status">
+                            <option value="">全部</option>
+                            <option value="true">啟用</option>
+                            <option value="false">停用</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label>搜尋</label>
+                        <input type="text" class="form-control" id="filter-search" placeholder="搜尋使用者名稱、姓名或員工編號...">
+                    </div>
+                    <div class="col-md-2">
+                        <label>&nbsp;</label>
+                        <button type="button" class="btn btn-info btn-block" id="btn-search">
+                            <i class="fas fa-search"></i> 搜尋
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <table id="users-table" class="table table-bordered table-hover">
+                    <thead>
+                        <tr>
+                            <th>使用者名稱</th>
+                            <th>姓名</th>
+                            <th>員工編號</th>
+                            <th>角色</th>
+                            <th>狀態</th>
+                            <th>建立時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data loaded via AJAX -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit User Modal -->
+<div class="modal fade" id="userModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userModalLabel">新增使用者</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form id="userForm">
+                <div class="modal-body">
+                    <input type="hidden" id="user-id" name="user_id">
+                    
+                    <div class="form-group">
+                        <label for="username">使用者名稱 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                        <small class="form-text text-muted">3-50 字元，僅允許英文、數字和底線</small>
+                    </div>
+                    
+                    <div class="form-group" id="password-group">
+                        <label for="password">密碼 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="password" name="password">
+                        <small class="form-text text-muted">至少 6 個字元</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="full_name">姓名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="employee_id">員工編號</label>
+                        <input type="text" class="form-control" id="employee_id" name="employee_id">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ad_account">AD 帳號</label>
+                        <input type="text" class="form-control" id="ad_account" name="ad_account">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="role_id">角色 <span class="text-danger">*</span></label>
+                        <select class="form-control" id="role_id" name="role_id" required>
+                            <option value="">請選擇角色</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="status-group" style="display: none;">
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="is_active" name="is_active" checked>
+                            <label class="custom-control-label" for="is_active">啟用帳號</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">儲存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重設密碼</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form id="resetPasswordForm">
+                <div class="modal-body">
+                    <input type="hidden" id="reset-user-id">
+                    <p>使用者：<strong id="reset-user-name"></strong></p>
+                    
+                    <div class="form-group">
+                        <label for="new_password">新密碼 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        <small class="form-text text-muted">至少 6 個字元</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-warning">重設密碼</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // DataTable
+    let table = null;
+    
+    // Load roles
+    function loadRoles() {
+        $.ajax({
+            url: '/api/users/roles',
+            method: 'GET',
+            success: function(response) {
+                if (response.status === 'success') {
+                    const roles = response.data.roles;
+                    
+                    // Populate role filters
+                    $('#filter-role').html('<option value="">全部</option>');
+                    $('#role_id').html('<option value="">請選擇角色</option>');
+                    
+                    roles.forEach(function(role) {
+                        $('#filter-role').append(
+                            `<option value="${role.role_id}">${role.role_name}</option>`
+                        );
+                        $('#role_id').append(
+                            `<option value="${role.role_id}">${role.role_name}</option>`
+                        );
+                    });
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '載入角色列表失敗');
+            }
+        });
+    }
+    
+    // Load users
+    function loadUsers() {
+        const roleId = $('#filter-role').val();
+        const isActive = $('#filter-status').val();
+        const search = $('#filter-search').val();
+        
+        let params = {};
+        if (roleId) params.role_id = roleId;
+        if (isActive !== '') params.is_active = isActive;
+        if (search) params.search = search;
+        params.per_page = 100; // Load more records
+        
+        $.ajax({
+            url: '/api/users/list',
+            method: 'GET',
+            data: params,
+            success: function(response) {
+                if (response.status === 'success') {
+                    renderUsersTable(response.data.users);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '載入使用者列表失敗');
+            }
+        });
+    }
+    
+    // Render users table
+    function renderUsersTable(users) {
+        if (table) {
+            table.destroy();
+        }
+        
+        const tbody = $('#users-table tbody');
+        tbody.empty();
+        
+        users.forEach(function(user) {
+            const statusBadge = user.is_active 
+                ? '<span class="badge badge-success status-badge">啟用</span>'
+                : '<span class="badge badge-secondary status-badge">停用</span>';
+            
+            const createdAt = moment(user.created_at).format('YYYY-MM-DD HH:mm');
+            
+            const row = `
+                <tr data-user-id="${user.user_id}">
+                    <td>${user.username}</td>
+                    <td>${user.full_name}</td>
+                    <td>${user.employee_id || '-'}</td>
+                    <td><span class="badge badge-primary">${user.role || '-'}</span></td>
+                    <td>${statusBadge}</td>
+                    <td>${createdAt}</td>
+                    <td>
+                        <button class="btn btn-sm btn-info btn-edit" data-id="${user.user_id}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-warning btn-reset-password" data-id="${user.user_id}" data-name="${user.full_name}">
+                            <i class="fas fa-key"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger btn-delete" data-id="${user.user_id}" data-name="${user.full_name}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.append(row);
+        });
+        
+        // Initialize DataTable
+        table = $('#users-table').DataTable({
+            language: {
+                url: '{{ url_for("static", filename="datatable_zh-Hant.json") }}'
+            },
+            order: [[5, 'desc']], // Sort by created_at
+            pageLength: 25
+        });
+    }
+    
+    // Add user button
+    $('#btn-add-user').click(function() {
+        $('#userModalLabel').text('新增使用者');
+        $('#userForm')[0].reset();
+        $('#user-id').val('');
+        $('#password-group').show();
+        $('#password').prop('required', true);
+        $('#status-group').hide();
+        $('#username').prop('readonly', false);
+        $('#userModal').modal('show');
+    });
+    
+    // Edit user button
+    $(document).on('click', '.btn-edit', function() {
+        const userId = $(this).data('id');
+        
+        $.ajax({
+            url: `/api/users/${userId}`,
+            method: 'GET',
+            success: function(response) {
+                if (response.status === 'success') {
+                    const user = response.data.user;
+                    
+                    $('#userModalLabel').text('編輯使用者');
+                    $('#user-id').val(user.user_id);
+                    $('#username').val(user.username).prop('readonly', true);
+                    $('#full_name').val(user.full_name);
+                    $('#employee_id').val(user.employee_id || '');
+                    $('#ad_account').val(user.ad_account || '');
+                    $('#role_id').val(user.role_id);
+                    $('#is_active').prop('checked', user.is_active);
+                    
+                    $('#password-group').hide();
+                    $('#password').prop('required', false);
+                    $('#status-group').show();
+                    
+                    $('#userModal').modal('show');
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '載入使用者資料失敗');
+            }
+        });
+    });
+    
+    // Submit user form
+    $('#userForm').submit(function(e) {
+        e.preventDefault();
+        
+        const userId = $('#user-id').val();
+        const isEdit = userId !== '';
+        
+        const formData = {
+            user_id: $('#username').val(),
+            full_name: $('#full_name').val(),
+            employee_id: $('#employee_id').val() || null,
+            ad_account: $('#ad_account').val() || null,
+            role_id: parseInt($('#role_id').val())
+        };
+        
+        if (!isEdit) {
+            formData.password = $('#password').val();
+        } else {
+            formData.is_active = $('#is_active').is(':checked');
+        }
+        
+        const url = isEdit ? `/api/users/${userId}/update` : '/api/users/create';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        $.ajax({
+            url: url,
+            method: method,
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                if (response.status === 'success') {
+                    toastr.success(response.message);
+                    $('#userModal').modal('hide');
+                    loadUsers();
+                } else {
+                    toastr.error(response.message);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '操作失敗');
+            }
+        });
+    });
+    
+    // Reset password button
+    $(document).on('click', '.btn-reset-password', function() {
+        const userId = $(this).data('id');
+        const userName = $(this).data('name');
+        
+        $('#reset-user-id').val(userId);
+        $('#reset-user-name').text(userName);
+        $('#new_password').val('');
+        $('#resetPasswordModal').modal('show');
+    });
+    
+    // Submit reset password form
+    $('#resetPasswordForm').submit(function(e) {
+        e.preventDefault();
+        
+        const userId = $('#reset-user-id').val();
+        const newPassword = $('#new_password').val();
+        
+        $.ajax({
+            url: `/api/users/${userId}/password`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                new_password: newPassword
+            }),
+            success: function(response) {
+                if (response.status === 'success') {
+                    toastr.success(response.message);
+                    $('#resetPasswordModal').modal('hide');
+                } else {
+                    toastr.error(response.message);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '重設密碼失敗');
+            }
+        });
+    });
+    
+    // Delete user button
+    $(document).on('click', '.btn-delete', function() {
+        const userId = $(this).data('id');
+        const userName = $(this).data('name');
+        
+        if (!confirm(`確定要停用使用者「${userName}」嗎？`)) {
+            return;
+        }
+        
+        $.ajax({
+            url: `/api/users/${userId}/delete`,
+            method: 'DELETE',
+            success: function(response) {
+                if (response.status === 'success') {
+                    toastr.success(response.message);
+                    loadUsers();
+                } else {
+                    toastr.error(response.message);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON;
+                toastr.error(error && error.message ? error.message : '停用使用者失敗');
+            }
+        });
+    });
+    
+    // Search button
+    $('#btn-search').click(function() {
+        loadUsers();
+    });
+    
+    // Search on Enter key
+    $('#filter-search').keypress(function(e) {
+        if (e.which === 13) {
+            loadUsers();
+        }
+    });
+    
+    // Initialize
+    loadRoles();
+    loadUsers();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,226 @@
+/* Custom CSS for FEM Admin System */
+
+/* General Styles */
+body {
+    font-family: 'Source Sans Pro', 'Microsoft JhengHei', sans-serif;
+}
+
+/* Badge Styles */
+.badge {
+    padding: 0.35em 0.65em;
+    font-size: 0.9em;
+}
+
+/* Card Enhancements */
+.card {
+    box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* DataTables Customization */
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter {
+    padding: 10px;
+}
+
+table.dataTable thead th {
+    background-color: #f4f6f9;
+    font-weight: 600;
+}
+
+/* Progress Bar */
+.progress-xs {
+    height: 0.5rem;
+}
+
+/* Login Page */
+.login-box {
+    width: 400px;
+}
+
+.login-card-body {
+    padding: 30px;
+}
+
+/* Small Box Hover Effect */
+.small-box:hover {
+    transform: translateY(-5px);
+    transition: all 0.3s ease;
+}
+
+/* Info Box */
+.info-box {
+    min-height: 90px;
+}
+
+.info-box-icon {
+    width: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Sidebar Menu */
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active {
+    background-color: #007bff;
+    color: #fff;
+}
+
+.nav-treeview > .nav-item > .nav-link.active {
+    background-color: rgba(255,255,255,.1);
+}
+
+/* Modal Customization */
+.modal-header {
+    background-color: #f4f6f9;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Button Group */
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Chart Container */
+canvas {
+    max-width: 100%;
+}
+
+/* Tree View */
+.jstree-default .jstree-clicked {
+    background: #007bff;
+    border-radius: 3px;
+    color: white;
+}
+
+.jstree-default .jstree-hovered {
+    background: #e9ecef;
+    border-radius: 3px;
+}
+
+/* Status Badge Colors */
+.badge-status-pending {
+    background-color: #6c757d;
+}
+
+.badge-status-inprogress {
+    background-color: #17a2b8;
+}
+
+.badge-status-completed {
+    background-color: #28a745;
+}
+
+.badge-status-abnormal {
+    background-color: #dc3545;
+}
+
+/* Loading Spinner */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    font-size: 3rem;
+    color: #fff;
+}
+
+/* Form Controls */
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* Select2 Theme */
+.select2-container--bootstrap4 .select2-selection {
+    border-color: #ced4da;
+}
+
+/* Responsive Tables */
+@media (max-width: 768px) {
+    .table-responsive {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .main-sidebar,
+    .main-header,
+    .main-footer,
+    .btn,
+    .card-tools {
+        display: none !important;
+    }
+    
+    .content-wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+}
+
+/* Utility Classes */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.font-weight-medium {
+    font-weight: 500;
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

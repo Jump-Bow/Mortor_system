@@ -1,0 +1,140 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}設施詳情 - {{ facility.facility_name }}{% endblock %}
+
+{% block page_title %}設施詳情{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('web.facility_list') }}">設施列表</a></li>
+<li class="breadcrumb-item active">{{ facility.facility_name }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <!-- Profile Image -->
+        <div class="card card-primary card-outline">
+            <div class="card-body box-profile">
+                <div class="text-center">
+                    <span class="fa-stack fa-2x">
+                        <i class="fas fa-circle fa-stack-2x text-primary"></i>
+                        <i class="fas fa-building fa-stack-1x fa-inverse"></i>
+                    </span>
+                </div>
+
+                <h3 class="profile-username text-center">{{ facility.facility_name }}</h3>
+                <p class="text-muted text-center">{{ facility.facility_type }}</p>
+
+                <ul class="list-group list-group-unbordered mb-3">
+                    <li class="list-group-item">
+                        <b>設施 ID</b> <a class="float-right">{{ facility.facility_id }}</a>
+                    </li>
+                    <li class="list-group-item">
+                        <b>所屬組織</b> <a class="float-right">{{ facility.org_name or '-' }}</a>
+                    </li>
+                    <li class="list-group-item">
+                        <b>上層設施</b> <a class="float-right">{{ facility.parent_facility_id or '-' }}</a>
+                    </li>
+                    <li class="list-group-item">
+                        <b>設備數量</b> <a class="float-right">{{ facility.equipment|list|length }}</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- About Me Box -->
+        <div class="card card-primary">
+            <div class="card-header">
+                <h3 class="card-title">詳細資訊</h3>
+            </div>
+            <div class="card-body">
+                <strong><i class="fas fa-file-alt mr-1"></i> 描述</strong>
+                <p class="text-muted">{{ facility.description or '無描述' }}</p>
+                
+                <hr>
+
+                <strong><i class="fas fa-clock mr-1"></i> 建立時間</strong>
+                <p class="text-muted">{{ facility.created_at }}</p>
+
+                <hr>
+
+                <strong><i class="fas fa-history mr-1"></i> 更新時間</strong>
+                <p class="text-muted">{{ facility.updated_at }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header p-2">
+                <ul class="nav nav-pills">
+                    <li class="nav-item"><a class="nav-link active" href="#equipment" data-toggle="tab">關聯設備</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#children" data-toggle="tab">下層設施</a></li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content">
+                    <div class="active tab-pane" id="equipment">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>設備編號</th>
+                                    <th>設備名稱</th>
+                                    <th>狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in facility.equipment %}
+                                <tr>
+                                    <td>{{ item.equipment_id }}</td>
+                                    <td>{{ item.equipment_name }}</td>
+                                    <td><span class="badge badge-{{ 'success' if item.status == 'active' else 'secondary' }}">{{ item.status }}</span></td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-default"><i class="fas fa-eye"></i></a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">無關聯設備</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="tab-pane" id="children">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>設施名稱</th>
+                                    <th>類型</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for child in facility.children %}
+                                <tr>
+                                    <td>{{ child.facility_name }}</td>
+                                    <td>{{ child.facility_type }}</td>
+                                    <td>
+                                        <a href="{{ url_for('web.facility_detail', facility_id=child.facility_id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> 查看
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">無下層設施</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,260 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}編輯任務 - FEM 設備保養管理系統{% endblock %}
+{% block page_title %}編輯任務{% endblock %}
+{% block breadcrumb_active %}編輯任務{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">任務資訊</h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.history.back()">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <form id="editTaskForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="task-number">任務編號</label>
+                                <input type="text" class="form-control" id="task-number" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="equipment-id">設備 <span class="text-danger">*</span></label>
+                                <select class="form-control" id="equipment-id" name="equipment_id" required>
+                                    <option value="">請選擇設備</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="inspection-date">檢查日期 <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="inspection-date" name="inspection_date" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="assigned-to">指派人員 <span class="text-danger">*</span></label>
+                                <select class="form-control select2" id="assigned-to" name="assigned_to" required>
+                                    <option value="">請選擇人員</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="status">狀態</label>
+                                <select class="form-control" id="status" name="status">
+                                    <option value="Pending">未派工 (Pending)</option>
+                                    <option value="InProgress">執行中 (In Progress)</option>
+                                    <option value="Completed">已完成 (Completed)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="aims-order-id">AIMS工單號</label>
+                                <select class="form-control select2" id="aims-order-id" name="aims_order_id">
+                                    <option value="">請選擇工單 (選填)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 儲存
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                            <i class="fas fa-times"></i> 取消
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let taskId = "{{ task_id }}";
+let taskData = null;
+
+$(document).ready(function() {
+    // 初始化 Select2
+    $('.select2').select2({
+        theme: 'bootstrap4',
+        width: '100%'
+    });
+    
+    loadEquipment();
+    loadUsers();
+    loadTaskData();
+    
+    $('#editTaskForm').on('submit', function(e) {
+        e.preventDefault();
+        saveTask();
+    });
+});
+
+function loadEquipment() {
+    $.ajax({
+        url: '/api/v1/facilities/equipment/all',
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+        },
+        success: function(response) {
+            if (response.status === 'success') {
+                const select = $('#equipment-id');
+                select.empty();
+                select.append('<option value="">請選擇設備</option>');
+                
+                response.data.equipment.forEach(function(eq) {
+                    select.append(`<option value="${eq.equipment_id}">${eq.equipment_name} (${eq.facility_name || '無設施'})</option>`);
+                });
+                
+                // 如果已經有 taskData，則設定選取值
+                if (taskData && taskData.equipment_id) {
+                    select.val(taskData.equipment_id).trigger('change');
+                }
+            }
+        },
+        error: function(xhr) {
+            toastr.error('載入設備列表失敗');
+        }
+    });
+}
+
+function loadUsers() {
+    $.ajax({
+        url: '/api/users/list',
+        method: 'GET',
+        data: { page: 1, per_page: 1000 },
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+        },
+        success: function(response) {
+            if (response.status === 'success') {
+                const select = $('#assigned-to');
+                select.empty();
+                select.append('<option value="">請選擇人員</option>');
+                
+                response.data.users.forEach(function(user) {
+                    if (user.is_active) {
+                        select.append(`<option value="${user.user_id}">${user.full_name} (${user.username})</option>`);
+                    }
+                });
+                
+                // 重新初始化 select2
+                select.trigger('change');
+            }
+        },
+        error: function(xhr) {
+            toastr.error('載入使用者列表失敗');
+        }
+    });
+}
+
+function loadTaskData() {
+    $.ajax({
+        url: `/api/v1/tasks/${taskId}`,
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+        },
+        success: function(response) {
+            if (response.status === 'success') {
+                taskData = response.data.task;
+                fillForm();
+            }
+        },
+        error: function(xhr) {
+            if (xhr.status === 401) {
+                window.location.href = '/login';
+            } else if (xhr.status === 404) {
+                toastr.error('任務不存在');
+                setTimeout(() => {
+                    window.location.href = '/task/list';
+                }, 2000);
+            } else {
+                toastr.error('載入任務資料失敗');
+            }
+        }
+    });
+}
+
+function fillForm() {
+    $('#task-number').val(taskData.task_number);
+    
+    // 如果設備列表已經載入，直接設定值
+    if ($('#equipment-id option').length > 1) {
+        $('#equipment-id').val(taskData.equipment_id).trigger('change');
+    }
+    
+    $('#inspection-date').val(taskData.inspection_date);
+    $('#assigned-to').val(taskData.assigned_to).trigger('change');
+    $('#status').val(taskData.status);
+    
+    // 設定 AIMS 工單號
+    if (taskData.aims_order_id) {
+        // 檢查選項是否存在
+        if ($('#aims-order-id option[value="' + taskData.aims_order_id + '"]').length > 0) {
+            $('#aims-order-id').val(taskData.aims_order_id).trigger('change');
+        } else {
+            // 如果選項不存在,新增該選項
+            $('#aims-order-id').append(`<option value="${taskData.aims_order_id}" selected>${taskData.aims_order_id}</option>`).trigger('change');
+        }
+    }
+}
+
+function saveTask() {
+    const formData = {
+        equipment_id: $('#equipment-id').val(),
+        inspection_date: $('#inspection-date').val(),
+        assigned_to: $('#assigned-to').val(),
+        status: $('#status').val(),
+        aims_order_id: $('#aims-order-id').val() || null
+    };
+    
+    $.ajax({
+        url: `/api/v1/tasks/${taskId}`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(formData),
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+        },
+        success: function(response) {
+            if (response.status === 'success') {
+                toastr.success('任務更新成功');
+                setTimeout(() => {
+                    window.location.href = `/task/${taskId}`;
+                }, 1500);
+            }
+        },
+        error: function(xhr) {
+            if (xhr.status === 401) {
+                window.location.href = '/login';
+            } else {
+                const errorMsg = xhr.responseJSON?.message || '更新失敗';
+                toastr.error(errorMsg);
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Dev)
+  postgres:
+    image: postgres:16-alpine
+    container_name: fem-postgres-dev
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: fem_dev
+      POSTGRES_USER: fem_admin
+      POSTGRES_PASSWORD: devpassword123
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U fem_admin -d fem_dev" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fem-dev-network
+
+  # FEM Admin Application (Dev)
+  fem-admin:
+    build: .
+    container_name: fem-admin-dev
+    ports:
+      - "5000:4999"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=run.py
+      - SECRET_KEY=dev-secret-key-docker
+      - JWT_SECRET_KEY=dev-jwt-secret-docker
+      - DEV_DB_TYPE=postgresql
+      - DEV_DB_SERVER=postgres
+      - DEV_DB_PORT=5432
+      - DEV_DB_NAME=fem_dev
+      - DEV_DB_USER=fem_admin
+      - DEV_DB_PASSWORD=devpassword123
+      - USE_MOCK_DATA=false
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fem-dev-network
+    command: >
+      sh -c "
+        echo '=== Waiting for PostgreSQL ==='
+        sleep 2
+        echo '=== Creating tables ==='
+        python -c 'from app import create_app, db; app = create_app(\"development\"); app.app_context().push(); db.create_all(); print(\"Tables created!\")'
+        echo '=== Starting Flask ==='
+        python run.py
+      "
+
+volumes:
+  postgres-dev-data:
+
+
+networks:
+  fem-dev-network:
+    driver: bridge

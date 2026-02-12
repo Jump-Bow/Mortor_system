@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>500 伺服器錯誤 - FEM 設備保養管理系統</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+</head>
+<body class="hold-transition">
+<div class="error-page">
+    <h2 class="headline text-danger"> 500</h2>
+    <div class="error-content">
+        <h3><i class="fas fa-exclamation-triangle text-danger"></i> 糟糕！發生錯誤。</h3>
+        <p>
+            伺服器遇到內部錯誤，無法完成您的請求。
+            請稍後再試，或<a href="{{ url_for('web.dashboard') }}">返回儀表板</a>。
+        </p>
+    </div>
+</div>
+</body>
+</html>

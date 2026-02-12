@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>404 頁面未找到 - FEM 設備保養管理系統</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+</head>
+<body class="hold-transition">
+<div class="error-page">
+    <h2 class="headline text-warning"> 404</h2>
+    <div class="error-content">
+        <h3><i class="fas fa-exclamation-triangle text-warning"></i> 糟糕！找不到頁面。</h3>
+        <p>
+            我們找不到您要找的頁面。
+            您可以<a href="{{ url_for('web.dashboard') }}">返回儀表板</a>或嘗試使用搜尋功能。
+        </p>
+    </div>
+</div>
+</body>
+</html>

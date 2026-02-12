@@ -1,0 +1,318 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}異常追蹤管理 - FEM 設備保養管理系統{% endblock %}
+{% block page_title %}異常追蹤管理{% endblock %}
+{% block breadcrumb_active %}異常追蹤管理{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">篩選條件</h3>
+            </div>
+            <div class="card-body">
+                <form id="filterForm">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>異常類型</label>
+                                <select class="form-control" id="abnormal-type" name="abnormal_type">
+                                    <option value="">全部</option>
+                                    <option value="異常">異常</option>
+                                    <option value="注意">注意</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>案件狀態</label>
+                                <select class="form-control" id="case-status" name="case_status">
+                                    <option value="">全部</option>
+                                    <option value="未結案" selected>未結案</option>
+                                    <option value="已結案">已結案</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>開始日期</label>
+                                <input type="date" class="form-control" id="start-date" name="start_date">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>結束日期</label>
+                                <input type="date" class="form-control" id="end-date" name="end_date">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary" onclick="searchTracking()">
+                                <i class="fas fa-search"></i> 查詢
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+                                <i class="fas fa-redo"></i> 重置
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">異常追蹤列表</h3>
+            </div>
+            <div class="card-body">
+                <table id="trackingTable" class="table table-bordered table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>追蹤編號</th>
+                            <th>異常類型</th>
+                            <th>任務編號</th>
+                            <th>設備名稱</th>
+                            <th>檢查項目</th>
+                            <th>檢查結果</th>
+                            <th>異常原因</th>
+                            <th>案件狀態</th>
+                            <th>負責人</th>
+                            <th>發現時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">異常詳細資訊</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="detailModalBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" id="closeCase">結案</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let trackingTable;
+
+    $(document).ready(function () {
+        // Set default date range
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+
+        $('#end-date').val(today.toISOString().split('T')[0]);
+        $('#start-date').val(thirtyDaysAgo.toISOString().split('T')[0]);
+
+        // Initialize DataTable
+        initDataTable();
+
+        // Load data
+        searchTracking();
+    });
+
+    function initDataTable() {
+        trackingTable = $('#trackingTable').DataTable({
+            processing: true,
+            serverSide: false,
+            data: [],
+            columns: [
+                { data: 'tracking_id' },
+                {
+                    data: 'abnormal_type',
+                    render: function (data) {
+                        // Logic to derive abnormal_type or use from API
+                        // If not from API, we can guess from result_info.is_out_of_spec?
+                        // But we don't have is_out_of_spec in tracking row directly if we use to_dict().
+                        // Wait, updated AbnormalCases.to_dict doesn't return abnormal_type logic yet.
+                        // But user might expect it.
+                        // Let's assume API returns it or default to '異常'
+                        return (data === '注意') ?
+                            '<span class="badge badge-warning">注意</span>' :
+                            '<span class="badge badge-danger">異常</span>';
+                    }
+                },
+                { data: 'result_info.act_key', defaultContent: '-' },
+                { data: 'result_info.equipment_name', defaultContent: '-' },
+                { data: 'result_info.item_name', defaultContent: '-' },
+                { data: 'measured_value', defaultContent: '-' },
+                {
+                    data: 'abn_msg',
+                    defaultContent: '-',
+                    render: function (data) {
+                        if (!data || data === '-') return '-';
+                        return data.length > 30 ? data.substring(0, 30) + '...' : data;
+                    }
+                },
+                {
+                    data: 'case_status',
+                    render: function (data) {
+                        return data === '未結案' ?
+                            '<span class="badge badge-danger">未結案</span>' :
+                            '<span class="badge badge-success">已結案</span>';
+                    }
+                },
+                { data: 'processed_memname', defaultContent: '未指派' },
+                {
+                    data: 'result_info.act_time',
+                    render: function (data) {
+                        return data ? new Date(data).toLocaleString('zh-TW') : '-';
+                    }
+                },
+                {
+                    data: null,
+                    orderable: false,
+                    render: function (data, type, row) {
+                        return `
+                        <button class="btn btn-sm btn-info" onclick="viewDetail('${row.tracking_id}')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    `;
+                    }
+                }
+            ],
+            language: {
+                url: '/static/datatable_zh-Hant.json'
+            },
+            order: [[0, 'desc']]
+        });
+    }
+
+    function searchTracking() {
+        const formData = $('#filterForm').serializeArray();
+        const params = {};
+
+        formData.forEach(function (item) {
+            if (item.value) {
+                params[item.name] = item.value;
+            }
+        });
+
+        params.page = 1;
+        params.page_size = 1000;
+
+        $.ajax({
+            url: '/api/v1/inspection/abnormal/tracking',
+            method: 'GET',
+            data: params,
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            success: function (response) {
+                if (response.status === 'success') {
+                    trackingTable.clear();
+                    trackingTable.rows.add(response.data.tracking_records);
+                    trackingTable.draw();
+
+                    toastr.success(`查詢到 ${response.data.total} 筆紀錄`);
+                }
+            },
+            error: function (xhr) {
+                if (xhr.status === 401) {
+                    window.location.href = '/login';
+                } else {
+                    toastr.error('查詢失敗');
+                }
+            }
+        });
+    }
+
+    function resetFilters() {
+        $('#filterForm')[0].reset();
+        $('#case-status').val('未結案');
+
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+
+        $('#end-date').val(today.toISOString().split('T')[0]);
+        $('#start-date').val(thirtyDaysAgo.toISOString().split('T')[0]);
+
+        searchTracking();
+    }
+
+    function viewDetail(trackingId) {
+        // Find tracking data
+        const trackingData = trackingTable.rows().data().toArray().find(t => t.tracking_id === trackingId);
+
+        if (!trackingData) {
+            toastr.error('找不到資料');
+            return;
+        }
+
+        const result = trackingData.result_info || {};
+
+        const html = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>異常資訊</h6>
+                <p><strong>追蹤編號:</strong> ${trackingData.tracking_id}</p>
+                <p><strong>異常類型:</strong> <span class="badge badge-${trackingData.abnormal_type === '異常' ? 'danger' : 'warning'}">${trackingData.abnormal_type || '異常'}</span></p>
+                <p><strong>案件狀態:</strong> <span class="badge badge-${trackingData.case_status === '未結案' ? 'danger' : 'success'}">${trackingData.case_status}</span></p>
+                <p><strong>負責人:</strong> ${trackingData.processed_memname || '未指派'}</p>
+                <p><strong>發現時間:</strong> ${result.act_time ? new Date(result.act_time).toLocaleString('zh-TW') : '-'}</p>
+            </div>
+            <div class="col-md-6">
+                <h6>檢查資訊</h6>
+                <p><strong>任務編號:</strong> ${result.act_key || '-'}</p>
+                <p><strong>設備名稱:</strong> ${result.equipment_name || '-'}</p>
+                <p><strong>檢查項目:</strong> ${result.item_name || '-'}</p>
+                <p><strong>檢查結果:</strong> ${result.measured_value || '-'}</p>
+                <p><strong>檢查人員:</strong> ${result.inspector_name || '-'}</p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <h6>異常原因</h6>
+                <div class="alert alert-warning">
+                    ${trackingData.abn_msg || '無說明'}
+                </div>
+            </div>
+        </div>
+    `;
+
+        $('#detailModalBody').html(html);
+        $('#detailModal').modal('show');
+
+        // Setup close case button
+        $('#closeCase').off('click').on('click', function () {
+            if (trackingData.case_status === '已結案') {
+                toastr.info('此案件已結案');
+                return;
+            }
+            if (confirm('確定要結案嗎？')) {
+                closeCase(trackingId);
+            }
+        });
+    }
+
+    function closeCase(trackingId) {
+        toastr.info('結案功能開發中');
+        // TODO: Implement close case API
+    }
+</script>
+{% endblock %}

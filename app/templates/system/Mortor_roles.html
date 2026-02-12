@@ -1,0 +1,410 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}角色管理 - FEM 設備保養管理系統{% endblock %}
+
+{% block page_title %}角色管理{% endblock %}
+
+{% block breadcrumb_active %}角色管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .role-badge {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        border-radius: 0.25rem;
+        font-weight: 500;
+    }
+    .user-count-badge {
+        background-color: #17a2b8;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">角色列表</h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-add-role">
+                        <i class="fas fa-plus"></i> 新增角色
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Filter Section -->
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <label>搜尋</label>
+                        <input type="text" class="form-control" id="filter-search" placeholder="搜尋角色名稱或說明...">
+                    </div>
+                    <div class="col-md-4">
+                        <label>&nbsp;</label>
+                        <button type="button" class="btn btn-info btn-block" id="btn-search">
+                            <i class="fas fa-search"></i> 搜尋
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Roles Table -->
+                <table id="roles-table" class="table table-bordered table-hover">
+                    <thead>
+                        <tr>
+                            <th width="10%">角色 ID</th>
+                            <th width="20%">角色名稱</th>
+                            <th width="40%">說明</th>
+                            <th width="15%">使用者數量</th>
+                            <th width="15%">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data loaded via AJAX -->
+                    </tbody>
+                </table>
+
+                <!-- Pagination -->
+                <div class="row mt-3">
+                    <div class="col-sm-12 col-md-5">
+                        <div class="dataTables_info" id="roles-table-info"></div>
+                    </div>
+                    <div class="col-sm-12 col-md-7">
+                        <div class="dataTables_paginate paging_simple_numbers float-right" id="roles-table-pagination"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Role Modal -->
+<div class="modal fade" id="roleModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="roleModalLabel">新增角色</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form id="roleForm">
+                <div class="modal-body">
+                    <input type="hidden" id="role-id" name="role_id">
+                    
+                    <div class="form-group">
+                        <label for="role_name">角色名稱 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="role_name" name="role_name" required maxlength="50">
+                        <small class="form-text text-muted">最多 50 字元</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="description">角色說明</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" maxlength="255"></textarea>
+                        <small class="form-text text-muted">最多 255 字元</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">儲存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger">
+                <h5 class="modal-title text-white">確認刪除</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>確定要刪除角色 <strong id="delete-role-name"></strong> 嗎？</p>
+                <p class="text-danger">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    注意：此操作無法復原！
+                </p>
+                <input type="hidden" id="delete-role-id">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="btn-confirm-delete">確認刪除</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let currentPage = 1;
+    let currentSearch = '';
+    
+    // Load roles
+    function loadRoles(page = 1) {
+        currentPage = page;
+        
+        $.ajax({
+            url: '/api/roles/list',
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer ' + sessionStorage.getItem('api_token')
+            },
+            data: {
+                page: page,
+                per_page: 20,
+                search: currentSearch
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    renderRoles(response.data.roles);
+                    renderPagination(response.data.pagination);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = '載入角色列表失敗';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                toastr.error(errorMsg);
+            }
+        });
+    }
+    
+    // Render roles table
+    function renderRoles(roles) {
+        let tbody = $('#roles-table tbody');
+        tbody.empty();
+        
+        if (roles.length === 0) {
+            tbody.append(`
+                <tr>
+                    <td colspan="5" class="text-center">沒有找到角色資料</td>
+                </tr>
+            `);
+            return;
+        }
+        
+        roles.forEach(function(role) {
+            let row = `
+                <tr>
+                    <td>${role.role_id}</td>
+                    <td><span class="role-badge bg-primary">${escapeHtml(role.role_name)}</span></td>
+                    <td>${role.description ? escapeHtml(role.description) : '<span class="text-muted">無</span>'}</td>
+                    <td><span class="user-count-badge">${role.user_count} 位使用者</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-info btn-edit" data-id="${role.role_id}">
+                            <i class="fas fa-edit"></i> 編輯
+                        </button>
+                        <button class="btn btn-sm btn-danger btn-delete" data-id="${role.role_id}" data-name="${escapeHtml(role.role_name)}" data-users="${role.user_count}">
+                            <i class="fas fa-trash"></i> 刪除
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.append(row);
+        });
+    }
+    
+    // Render pagination
+    function renderPagination(pagination) {
+        let info = `顯示 ${pagination.total > 0 ? ((pagination.page - 1) * pagination.per_page + 1) : 0} 到 ${Math.min(pagination.page * pagination.per_page, pagination.total)} 筆，共 ${pagination.total} 筆`;
+        $('#roles-table-info').text(info);
+        
+        let paginationHtml = '<ul class="pagination">';
+        
+        // Previous button
+        paginationHtml += `
+            <li class="page-item ${!pagination.has_prev ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${pagination.page - 1}">上一頁</a>
+            </li>
+        `;
+        
+        // Page numbers
+        for (let i = 1; i <= pagination.pages; i++) {
+            if (i === 1 || i === pagination.pages || (i >= pagination.page - 2 && i <= pagination.page + 2)) {
+                paginationHtml += `
+                    <li class="page-item ${i === pagination.page ? 'active' : ''}">
+                        <a class="page-link" href="#" data-page="${i}">${i}</a>
+                    </li>
+                `;
+            } else if (i === pagination.page - 3 || i === pagination.page + 3) {
+                paginationHtml += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            }
+        }
+        
+        // Next button
+        paginationHtml += `
+            <li class="page-item ${!pagination.has_next ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${pagination.page + 1}">下一頁</a>
+            </li>
+        `;
+        
+        paginationHtml += '</ul>';
+        $('#roles-table-pagination').html(paginationHtml);
+    }
+    
+    // Pagination click handler
+    $(document).on('click', '#roles-table-pagination a.page-link', function(e) {
+        e.preventDefault();
+        let page = $(this).data('page');
+        if (page && page > 0) {
+            loadRoles(page);
+        }
+    });
+    
+    // Search button
+    $('#btn-search').click(function() {
+        currentSearch = $('#filter-search').val().trim();
+        loadRoles(1);
+    });
+    
+    // Search on Enter key
+    $('#filter-search').keypress(function(e) {
+        if (e.which === 13) {
+            $('#btn-search').click();
+        }
+    });
+    
+    // Add role button
+    $('#btn-add-role').click(function() {
+        $('#roleModalLabel').text('新增角色');
+        $('#roleForm')[0].reset();
+        $('#role-id').val('');
+        $('#roleModal').modal('show');
+    });
+    
+    // Edit role button
+    $(document).on('click', '.btn-edit', function() {
+        let roleId = $(this).data('id');
+        
+        $.ajax({
+            url: '/api/roles/' + roleId,
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer ' + sessionStorage.getItem('api_token')
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    let role = response.data.role;
+                    $('#roleModalLabel').text('編輯角色');
+                    $('#role-id').val(role.role_id);
+                    $('#role_name').val(role.role_name);
+                    $('#description').val(role.description || '');
+                    $('#roleModal').modal('show');
+                }
+            },
+            error: function(xhr) {
+                toastr.error('載入角色資料失敗');
+            }
+        });
+    });
+    
+    // Delete role button
+    $(document).on('click', '.btn-delete', function() {
+        let roleId = $(this).data('id');
+        let roleName = $(this).data('name');
+        let userCount = $(this).data('users');
+        
+        if (userCount > 0) {
+            toastr.warning(`此角色仍有 ${userCount} 位使用者使用，無法刪除`);
+            return;
+        }
+        
+        $('#delete-role-id').val(roleId);
+        $('#delete-role-name').text(roleName);
+        $('#deleteModal').modal('show');
+    });
+    
+    // Confirm delete
+    $('#btn-confirm-delete').click(function() {
+        let roleId = $('#delete-role-id').val();
+        
+        $.ajax({
+            url: '/api/roles/' + roleId,
+            method: 'DELETE',
+            headers: {
+                'Authorization': 'Bearer ' + sessionStorage.getItem('api_token')
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    toastr.success('角色刪除成功');
+                    $('#deleteModal').modal('hide');
+                    loadRoles(currentPage);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = '刪除角色失敗';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                toastr.error(errorMsg);
+            }
+        });
+    });
+    
+    // Submit role form
+    $('#roleForm').submit(function(e) {
+        e.preventDefault();
+        
+        let roleId = $('#role-id').val();
+        let url = roleId ? '/api/roles/' + roleId : '/api/roles/create';
+        let method = roleId ? 'PUT' : 'POST';
+        
+        let data = {
+            role_name: $('#role_name').val().trim(),
+            description: $('#description').val().trim()
+        };
+        
+        $.ajax({
+            url: url,
+            method: method,
+            headers: {
+                'Authorization': 'Bearer ' + sessionStorage.getItem('api_token'),
+                'Content-Type': 'application/json'
+            },
+            data: JSON.stringify(data),
+            success: function(response) {
+                if (response.status === 'success') {
+                    toastr.success(roleId ? '角色更新成功' : '角色建立成功');
+                    $('#roleModal').modal('hide');
+                    loadRoles(currentPage);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = roleId ? '更新角色失敗' : '建立角色失敗';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                toastr.error(errorMsg);
+            }
+        });
+    });
+    
+    // Utility function to escape HTML
+    function escapeHtml(text) {
+        if (!text) return '';
+        let map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+    
+    // Initial load
+    loadRoles(1);
+});
+</script>
+{% endblock %}

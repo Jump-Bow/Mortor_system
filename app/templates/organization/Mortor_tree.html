@@ -1,0 +1,191 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}組織架構 - FEM 設備保養管理系統{% endblock %}
+{% block page_title %}組織架構{% endblock %}
+{% block breadcrumb_active %}組織架構{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/jstree/themes/default/style-3.3.15.min.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">組織樹狀結構</h3>
+            </div>
+            <div class="card-body">
+                <div id="organizationTree"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">組織資訊</h3>
+            </div>
+            <div class="card-body" id="orgInfo">
+                <div class="text-center text-muted">
+                    <i class="fas fa-info-circle fa-3x"></i>
+                    <p class="mt-3">請從左側選擇組織查看詳細資訊</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card" id="facilitiesCard" style="display: none;">
+            <div class="card-header">
+                <h3 class="card-title">關聯設施</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-hover" id="facilitiesTable">
+                    <thead>
+                        <tr>
+                            <th>設施名稱</th>
+                            <th>類型</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='vendor/jstree/jstree-3.3.15.min.js') }}"></script>
+<script>
+let selectedOrgId = null;
+const apiToken = $('meta[name="api-token"]').attr('content');
+
+$(document).ready(function() {
+    loadOrganizationTree();
+});
+
+function loadOrganizationTree() {
+    $.ajax({
+        url: '/api/v1/organizations/tree',
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + apiToken
+        },
+        success: function(response) {
+            if (response.status === 'success') {
+                buildTree(response.data.organizations);
+            }
+        },
+        error: function(xhr) {
+            if (xhr.status === 401) {
+                toastr.error('未授權，請重新登入');
+            } else {
+                toastr.error('載入組織架構失敗');
+            }
+        }
+    });
+}
+
+function buildTree(orgs) {
+    const treeData = convertToJsTreeFormat(orgs);
+    
+    $('#organizationTree').jstree({
+        'core': {
+            'data': treeData,
+            'themes': {
+                'icons': false
+            }
+        }
+    }).on('select_node.jstree', function(e, data) {
+        const orgId = data.node.id;
+        loadOrganizationDetail(orgId);
+    });
+}
+
+function convertToJsTreeFormat(orgs, parent = '#') {
+    let result = [];
+    
+    orgs.forEach(function(org) {
+        const node = {
+            id: org.org_id.toString(),
+            text: org.org_name,
+            parent: parent,
+            state: { opened: true }
+        };
+        
+        result.push(node);
+        
+        if (org.children && org.children.length > 0) {
+            result = result.concat(convertToJsTreeFormat(org.children, org.org_id.toString()));
+        }
+    });
+    
+    return result;
+}
+
+function loadOrganizationDetail(orgId) {
+    selectedOrgId = orgId;
+    
+    $.ajax({
+        url: `/api/v1/organizations/${orgId}?include_facilities=true`,
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + apiToken
+        },
+        success: function(response) {
+            if (response.status === 'success') {
+                const org = response.data.organization;
+                const facilities = response.data.facilities;
+                
+                displayOrgInfo(org);
+                displayFacilities(facilities);
+            }
+        },
+        error: function() {
+            toastr.error('載入組織詳情失敗');
+        }
+    });
+}
+
+function displayOrgInfo(org) {
+    const html = `
+        <div class="row">
+            <div class="col-md-12">
+                <p><strong>組織 ID:</strong> ${org.org_id}</p>
+                <p><strong>組織名稱:</strong> ${org.org_name}</p>
+                <p><strong>上層組織 ID:</strong> ${org.parent_org_id || '-'}</p>
+            </div>
+        </div>
+    `;
+    
+    $('#orgInfo').html(html);
+}
+
+function displayFacilities(facilities) {
+    if (!facilities || facilities.length === 0) {
+        $('#facilitiesCard').hide();
+        return;
+    }
+    
+    $('#facilitiesCard').show();
+    const tbody = $('#facilitiesTable tbody');
+    tbody.empty();
+    
+    facilities.forEach(function(fac) {
+        const row = `
+            <tr>
+                <td>${fac.facility_name}</td>
+                <td><span class="badge badge-info">${fac.facility_type}</span></td>
+                <td>
+                    <a href="/facility/${fac.facility_id}" class="btn btn-sm btn-info">
+                        <i class="fas fa-eye"></i> 查看
+                    </a>
+                </td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+</script>
+{% endblock %}

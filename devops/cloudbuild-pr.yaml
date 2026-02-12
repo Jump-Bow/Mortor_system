@@ -1,0 +1,18 @@
+# ==============================================================================
+# cloudbuild-pr.yaml (無 Secret Manager 設定)
+# ==============================================================================
+steps:
+  # 步驟 1: 驗證 Docker Image 是否可以成功建置
+  # 注意：這裡只執行 build，不執行 push。
+  # 目的是確保 Dockerfile 語法正確且 build args 設定無誤。
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build image validation'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - >
+        docker build -t pr-validation-image:temp .
+    # 已移除 secretEnv 區塊，因為不再從 Secret Manager 獲取密鑰
+
+# 已移除 availableSecrets 區塊
+timeout: 1800s
