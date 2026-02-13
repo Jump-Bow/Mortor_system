@@ -3,7 +3,7 @@ System Logs API Blueprint
 系統日誌 API
 """
 from flask import Blueprint, request, jsonify
-from app.models.Mortor_system_log import UserActionLog
+from app.models.Mortor_system_log import UserLog
 from app.models.Mortor_user import HrAccount
 from app.utils.decorators import log_request, admin_required, web_or_api_required
 from datetime import datetime, timedelta
@@ -38,7 +38,7 @@ def list_logs(**kwargs):
     per_page = request.args.get('per_page', 50, type=int)
     
     # Build query
-    query = UserActionLog.query
+    query = UserLog.query
     
     if userid:
         query = query.filter_by(userid=userid)
@@ -46,7 +46,7 @@ def list_logs(**kwargs):
     if start_date:
         try:
             start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
-            query = query.filter(UserActionLog.timestamp >= start_datetime)
+            query = query.filter(UserLog.timestamp >= start_datetime)
         except ValueError:
             return jsonify({
                 'status': 'error',
@@ -56,7 +56,7 @@ def list_logs(**kwargs):
     if end_date:
         try:
             end_datetime = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-            query = query.filter(UserActionLog.timestamp < end_datetime)
+            query = query.filter(UserLog.timestamp < end_datetime)
         except ValueError:
             return jsonify({
                 'status': 'error',
@@ -64,7 +64,7 @@ def list_logs(**kwargs):
             }), 400
     
     # Paginate
-    pagination = query.order_by(UserActionLog.timestamp.desc()).paginate(
+    pagination = query.order_by(UserLog.timestamp.desc()).paginate(
         page=page,
         per_page=per_page,
         error_out=False
@@ -109,9 +109,9 @@ def get_stats(**kwargs):
     start_date = end_date - timedelta(days=days)
     
     # Get logs in date range
-    logs = UserActionLog.query.filter(
-        UserActionLog.timestamp >= start_date,
-        UserActionLog.timestamp <= end_date
+    logs = UserLog.query.filter(
+        UserLog.timestamp >= start_date,
+        UserLog.timestamp <= end_date
     ).all()
     
     # Calculate statistics
@@ -171,7 +171,7 @@ def get_log_detail(log_id, **kwargs):
     Response:
         - log: 日誌詳細資訊
     """
-    log = UserActionLog.query.get(log_id)
+    log = UserLog.query.get(log_id)
     
     if not log:
         return jsonify({

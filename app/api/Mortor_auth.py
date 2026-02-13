@@ -5,7 +5,7 @@ Authentication API Blueprint
 from flask import Blueprint, request, jsonify, current_app
 from app import db
 from app.models.Mortor_user import HrAccount
-from app.models.Mortor_system_log import SystemLog, UserActionLog
+from app.models.Mortor_system_log import SysLog, UserLog
 from app.auth.jwt_handler import JWTHandler, token_required
 from app.utils.decorators import validate_json, rate_limit, log_request
 from app.utils.validators import Validator
@@ -86,7 +86,7 @@ def login():
     )
     
     # Log successful login
-    UserActionLog.log_action( # Changed from UserLog.log_action
+    UserLog.log_action( # Changed from UserLog.log_action
         user_id=user.id,
         action_type='LOGIN',
         description=f'使用者 {user.id} 登入系統',
@@ -117,7 +117,7 @@ def logout(**kwargs):
     """
     current_user_id = JWTHandler.get_jwt_identity() # Changed from get_jwt_identity() to JWTHandler.get_jwt_identity()
     
-    UserActionLog.log_action( # Changed from UserLog.log_action to UserActionLog.log_action
+    UserLog.log_action( # Changed from UserLog.log_action to UserActionLog.log_action
         user_id=current_user_id,
         action_type='LOGOUT',
         description='User logged out',

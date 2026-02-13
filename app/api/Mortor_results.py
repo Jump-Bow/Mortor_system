@@ -267,7 +267,7 @@ def upload_photo(**kwargs):
     # Verify result exists
     result = InspectionResult.query.filter_by(
         actid=actid,
-        itemid=itemid
+        item_id=itemid
     ).first()
     
     if not result:
@@ -286,7 +286,7 @@ def upload_photo(**kwargs):
         }), 400
     
     # Update result photo path
-    result.resultphoto = photo_path
+    result.result_photo = photo_path
     db.session.commit()
     
     current_app.logger.info(

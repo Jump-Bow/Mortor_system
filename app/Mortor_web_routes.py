@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db
 from app.models.Mortor_user import HrAccount
-from app.models.Mortor_system_log import UserActionLog
+from app.models.Mortor_system_log import UserLog
 from app.models.Mortor_organization import TOrganization
 
 web_bp = Blueprint('web', __name__)
@@ -46,7 +46,7 @@ def login():
         login_user(user, remember=remember)
         
         # Log the action
-        UserActionLog.log_action(
+        UserLog.log_action(
             user_id=user.id,
             action_type='WEB_LOGIN',
             description=f'使用者 {user.id} 透過網頁登入系統',

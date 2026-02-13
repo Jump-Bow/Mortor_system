@@ -7,7 +7,7 @@ from .Mortor_user import HrAccount, Role
 from .Mortor_equipment import TEquipment, EquitCheckItem
 from .Mortor_inspection import TJob, InspectionResult
 from .Mortor_abnormal import AbnormalCases
-from .Mortor_system_log import SystemLog, UserActionLog
+from .Mortor_system_log import SysLog, UserLog
 
 __all__ = [
     'TOrganization',
@@ -19,6 +19,6 @@ __all__ = [
     'TJob',
     'InspectionResult',
     'AbnormalCases',
-    'SystemLog',
-    'UserActionLog',
+    'SysLog',
+    'UserLog',
 ]

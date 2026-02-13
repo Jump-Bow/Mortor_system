@@ -1,0 +1,141 @@
+﻿Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+docker : [2026-02-12 
+18:38:00 +0000] [1] [
+INFO] Starting gunico
+rn 25.0.3
+位於 線路:1 字元:1
++ docker logs fem-adm
+in 2>&1 | Out-File -F
+ilePath d:\chimei\chi
+mei-fem- ...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: ([2026-0   
+ 2-12 18:...gunic    
+orn 25.0.3:Strin    g
+) [], RemoteExc    ep
+tion
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+[parameters: {'log_id': '46d228e3-52e7-4341-9148-b8947a77b195', 'timestamp': datetime.datetime(2026, 2, 12, 18, 38, 5, 218573), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:38:05 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': 'b661c13d-1e43-4f0b-b364-ca3ec9fdd47f', 'timestamp': datetime.datetime(2026, 2, 12, 18, 38, 10, 308511), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:38:10 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': '01f3334d-1ce8-4483-bee6-05bb64fc7734', 'timestamp': datetime.datetime(2026, 2, 12, 18, 38, 15, 375589), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:38:15 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+[2026-02-12 18:38:00 
++0000] [1] [INFO] Lis
+tening at: http://0.0
+.0.0:5000 (1)
+[2026-02-12 18:38:00 
++0000] [1] [INFO] Usi
+ng worker: gthread
+[2026-02-12 18:38:00 
++0000] [7] [INFO] Boo
+ting worker with pid:
+ 7
+[2026-02-12 18:38:00 
++0000] [8] [INFO] Boo
+ting worker with pid:
+ 8
+[2026-02-12 18:38:00 
++0000] [9] [INFO] Boo
+ting worker with pid:
+ 9
+[2026-02-12 18:38:00 
++0000] [10] [INFO] Bo
+oting worker with pid
+: 10
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': '608ab55e-b94f-482c-9a30-58548c441f3c', 'timestamp': datetime.datetime(2026, 2, 12, 18, 38, 20, 463863), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:38:20 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': 'b0880f02-fe3b-4903-b01d-9458cea2117a', 'timestamp': datetime.datetime(2026, 2, 12, 18, 38, 25, 617249), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:38:25 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': 'fdbfae36-33cd-4ddb-9b9a-cc372cc81615', 'timestamp': datetime.datetime(2026, 2, 12, 18, 38, 30, 751930), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:38:30 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': '43c3868f-e95c-478b-a815-715ebaf72b44', 'timestamp': datetime.datetime(2026, 2, 12, 18, 38, 35, 830276), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:38:35 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': 'd716ca4f-d74c-41c5-a89b-688c76be989b', 'timestamp': datetime.datetime(2026, 2, 12, 18, 38, 40, 897602), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:38:40 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': '3ee9102c-152e-4fd3-a747-2cd3717fbaf2', 'timestamp': datetime.datetime(2026, 2, 12, 18, 39, 10, 986827), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:39:10 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': '4077f305-429f-4b80-bd34-39d726f64e24', 'timestamp': datetime.datetime(2026, 2, 12, 18, 39, 41, 70076), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:39:41 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': 'b9e74dfd-a7d1-4b25-8d4f-b5e8c59263c6', 'timestamp': datetime.datetime(2026, 2, 12, 18, 40, 11, 148071), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:40:11 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"
+Error creating system log: (psycopg2.errors.UndefinedTable) relation "sys_log" does not exist
+LINE 1: INSERT INTO sys_log (log_id, timestamp, level, module) VALUE...
+                    ^
+
+[SQL: INSERT INTO sys_log (log_id, timestamp, level, module) VALUES (%(log_id)s, %(timestamp)s, %(level)s, %(module)s)]
+[parameters: {'log_id': 'f641221b-287a-4e35-b5db-676459246ea2', 'timestamp': datetime.datetime(2026, 2, 12, 18, 40, 41, 231601), 'level': 'WARN', 'module': 'Auth'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+127.0.0.1 - - [12/Feb/2026:18:40:41 +0000] "GET /api/v1/auth/verify HTTP/1.1" 401 96 "-" "curl/7.88.1"

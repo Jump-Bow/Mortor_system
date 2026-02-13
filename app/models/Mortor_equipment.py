@@ -58,6 +58,7 @@ class EquitCheckItem(db.Model):
     
     # Relationships
     inspection_results = db.relationship('InspectionResult', backref='check_item', lazy='dynamic')
+    # Note: backref='check_item' creates InspectionResult.check_item automatically
     
     def __repr__(self):
         return f'<EquitCheckItem {self.item_id} - {self.item_name}>'

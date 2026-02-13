@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from flask import current_app, request
 from functools import wraps
 from typing import Dict, Optional, Tuple
-from app.models.Mortor_system_log import SystemLog
+from app.models.Mortor_system_log import SysLog
 
 
 class JWTHandler:
@@ -151,7 +151,7 @@ def token_required(f):
         token = JWTHandler.get_token_from_header()
         
         if not token:
-            SystemLog.create(level='WARN', module='Auth')
+            SysLog.create(level='WARN', module='Auth')
             return {
                 'status': 'error',
                 'error_code': 'UNAUTHORIZED',
@@ -162,7 +162,7 @@ def token_required(f):
         
         if not payload:
             msg = 'Token 無效或已過期' if error == 'EXPIRED' else '無效的 Token'
-            SystemLog.create(level='WARN', module='Auth')
+            SysLog.create(level='WARN', module='Auth')
             return {
                 'status': 'error',
                 'error_code': 'UNAUTHORIZED',
@@ -171,7 +171,7 @@ def token_required(f):
         
         # Check if access token
         if payload.get('type') != 'access':
-            SystemLog.create(level='WARN', module='Auth')
+            SysLog.create(level='WARN', module='Auth')
             return {
                 'status': 'error',
                 'error_code': 'UNAUTHORIZED',
@@ -182,7 +182,7 @@ def token_required(f):
         from app.models.Mortor_user import HrAccount
         user = HrAccount.query.get(payload['user_id'])
         if not user:
-            SystemLog.create(level='WARN', module='Auth')
+            SysLog.create(level='WARN', module='Auth')
             return {
                 'status': 'error',
                 'error_code': 'UNAUTHORIZED',

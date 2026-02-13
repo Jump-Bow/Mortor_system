@@ -21,9 +21,10 @@ class TJob(db.Model):
     mterm = db.Column(db.String(8), comment='頻率(1M, 3M)')
     
     # Relationships
+    equipment = db.relationship('TEquipment', back_populates='jobs')
     results = db.relationship('InspectionResult', backref='job', lazy='dynamic', cascade='all, delete-orphan')
     abnormal_cases = db.relationship('AbnormalCases', backref='job', lazy='dynamic', cascade='all, delete-orphan')
-    assigned_user = db.relationship('HrAccount', foreign_keys=[act_mem_id])
+    assigned_user = db.relationship('HrAccount', foreign_keys=[act_mem_id], backref=db.backref('jobs', lazy='dynamic'))
     
     def __repr__(self):
         return f'<TJob {self.actid}>'
@@ -85,9 +86,9 @@ class InspectionResult(db.Model):
     result_photo = db.Column(db.String(2000), comment='照片位置')
     is_out_of_spec = db.Column(db.SmallInteger, comment='是否異常(0,1,2,3)')
     
-    # Relationships
-    check_item = db.relationship('EquitCheckItem', backref='results')
-    inspector = db.relationship('HrAccount', backref='inspections')
+    # Relationships are managed by the other side:
+    # - check_item: defined via EquitCheckItem.inspection_results (backref='check_item')
+    # - inspector: defined via HrAccount.inspection_results (backref='inspector')
     
     def __repr__(self):
         return f'<InspectionResult {self.actid} - {self.item_id}>'

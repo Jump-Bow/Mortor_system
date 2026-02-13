@@ -39,9 +39,11 @@ class HrAccount(UserMixin, db.Model):
     password = db.Column(db.String(255))  # 加大長度以容納 hash
     
     # Relationships
-    jobs = db.relationship('TJob', backref='assigned_user', lazy='dynamic')
-    inspection_results = db.relationship('InspectionResult', backref='inspector', lazy='dynamic')
-    # Note: UserActionLog defines the relationship with backref='user', accessible as user.logs
+    # - jobs: managed by TJob.assigned_user (backref='jobs')
+    # - inspector/inspection_results: managed by EquitCheckItem side
+    inspection_results = db.relationship('InspectionResult', backref='inspector', lazy='dynamic',
+                                          foreign_keys='InspectionResult.act_mem_id')
+    # - logs: managed by UserLog.user (backref='logs')
     
     def __repr__(self):
         return f'<HrAccount {self.id} - {self.name}>'

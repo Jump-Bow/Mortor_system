@@ -7,7 +7,7 @@ from app import db
 from app.models.Mortor_user import HrAccount, Role
 from app.models.Mortor_system_log import UserLog
 from app.auth.jwt_handler import token_required
-from app.utils.decorators import log_request
+from app.utils.decorators import log_request, web_or_api_required, admin_required
 from app.utils.validators import Validator
 
 users_bp = Blueprint('users', __name__)

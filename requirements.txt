@@ -12,6 +12,7 @@ WTForms==3.1.1
 # Database
 psycopg2-binary==2.9.9
 SQLAlchemy==2.0.23
+redis==5.0.1
 
 # Authentication & Security
 PyJWT==2.8.0
@@ -56,4 +57,3 @@ python-json-logger==2.0.7
 
 # Admin Template
 Flask-Admin==1.6.1
-flask_cors==4.0.0

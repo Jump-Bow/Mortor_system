@@ -88,7 +88,7 @@ def create_app(config_name: str = None) -> Flask:
         from app.models import (
             TOrganization, HrOrganization, HrAccount, Role,
             TEquipment, EquitCheckItem, TJob, InspectionResult,
-            AbnormalCases, SystemLog, UserActionLog
+            AbnormalCases, SysLog, UserLog
         )
         return {
             'db': db,
@@ -101,8 +101,8 @@ def create_app(config_name: str = None) -> Flask:
             'TJob': TJob,
             'InspectionResult': InspectionResult,
             'AbnormalCases': AbnormalCases,
-            'SystemLog': SystemLog,
-            'UserActionLog': UserActionLog,
+            'SysLog': SysLog,
+            'UserLog': UserLog,
         }
     
     app.logger.info(f'FEM Application started in {config_name} mode')
@@ -179,7 +179,7 @@ def register_blueprints(app: Flask) -> None:
 
 def register_error_handlers(app: Flask) -> None:
     """Register error handlers"""
-    from app.models.Mortor_system_log import SystemLog
+    from app.models.Mortor_system_log import SysLog
     import traceback
     
     @app.errorhandler(400)
@@ -192,7 +192,7 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(401)
     def unauthorized(error):
-        SystemLog.create(level='WARN', module='Auth')
+        SysLog.create(level='WARN', module='Auth')
         return jsonify({
             'status': 'error',
             'error_code': 'UNAUTHORIZED',
@@ -201,13 +201,13 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(403)
     def forbidden(error):
-        SystemLog.create(level='WARN', module='Auth')
+        SysLog.create(level='WARN', module='Auth')
         return jsonify({
             'status': 'error',
             'error_code': 'FORBIDDEN',
             'message': '禁止訪問，權限不足'
         }), 403
-    
+
     @app.errorhandler(404)
     def not_found(error):
         return jsonify({
@@ -243,7 +243,7 @@ def register_error_handlers(app: Flask) -> None:
     @app.errorhandler(500)
     def internal_server_error(error):
         app.logger.error(f'Internal Server Error: {error}')
-        SystemLog.create(level='ERROR', module='System')
+        SysLog.create(level='ERROR', module='System')
         return jsonify({
             'status': 'error',
             'error_code': 'INTERNAL_SERVER_ERROR',
@@ -252,7 +252,7 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(503)
     def service_unavailable(error):
-        SystemLog.create(level='ERROR', module='System')
+        SysLog.create(level='ERROR', module='System')
         return jsonify({
             'status': 'error',
             'error_code': 'SERVICE_UNAVAILABLE',
