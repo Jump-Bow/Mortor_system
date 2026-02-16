@@ -16,6 +16,14 @@
                     <div class="row">
                         <div class="col-md-3">
                             <div class="form-group">
+                                <label>組織</label>
+                                <select class="form-control select2" id="org-filter" name="org_id">
+                                    <option value="">全部組織</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
                                 <label>異常類型</label>
                                 <select class="form-control" id="abnormal-type" name="abnormal_type">
                                     <option value="">全部</option>
@@ -36,6 +44,16 @@
                         </div>
                         <div class="col-md-3">
                             <div class="form-group">
+                                <label>設備</label>
+                                <select class="form-control select2" id="equipment-filter" name="equipment_id">
+                                    <option value="">全部設備</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
                                 <label>開始日期</label>
                                 <input type="date" class="form-control" id="start-date" name="start_date">
                             </div>
@@ -46,15 +64,21 @@
                                 <input type="date" class="form-control" id="end-date" name="end_date">
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12">
-                            <button type="button" class="btn btn-primary" onclick="searchTracking()">
-                                <i class="fas fa-search"></i> 查詢
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="resetFilters()">
-                                <i class="fas fa-redo"></i> 重置
-                            </button>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>&nbsp;</label>
+                                <div>
+                                    <button type="button" class="btn btn-primary" onclick="searchTracking()">
+                                        <i class="fas fa-search"></i> 查詢
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+                                        <i class="fas fa-redo"></i> 重置
+                                    </button>
+                                    <button type="button" class="btn btn-success" onclick="exportTracking()">
+                                        <i class="fas fa-file-export"></i> 匯出
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -120,6 +144,9 @@
     let trackingTable;
 
     $(document).ready(function () {
+        // Initialize Select2
+        $('.select2').select2({ theme: 'bootstrap4' });
+
         // Set default date range
         const today = new Date();
         const thirtyDaysAgo = new Date(today);
@@ -128,12 +155,48 @@
         $('#end-date').val(today.toISOString().split('T')[0]);
         $('#start-date').val(thirtyDaysAgo.toISOString().split('T')[0]);
 
+        // Load filter options
+        loadOrganizations();
+        loadEquipment();
+
         // Initialize DataTable
         initDataTable();
 
         // Load data
         searchTracking();
     });
+
+    function loadOrganizations() {
+        $.ajax({
+            url: '/api/v1/organizations/list',
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+            success: function (response) {
+                if (response.status === 'success') {
+                    const select = $('#org-filter');
+                    (response.data.organizations || []).forEach(function (org) {
+                        select.append(`<option value="${org.org_id}">${org.org_name}</option>`);
+                    });
+                }
+            }
+        });
+    }
+
+    function loadEquipment() {
+        $.ajax({
+            url: '/api/v1/equipment/list',
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+            success: function (response) {
+                if (response.status === 'success') {
+                    const select = $('#equipment-filter');
+                    (response.data.equipment || []).forEach(function (eq) {
+                        select.append(`<option value="${eq.id}">${eq.name}</option>`);
+                    });
+                }
+            }
+        });
+    }
 
     function initDataTable() {
         trackingTable = $('#trackingTable').DataTable({
@@ -244,6 +307,8 @@
     function resetFilters() {
         $('#filterForm')[0].reset();
         $('#case-status').val('未結案');
+        $('#org-filter').val('').trigger('change');
+        $('#equipment-filter').val('').trigger('change');
 
         const today = new Date();
         const thirtyDaysAgo = new Date(today);
@@ -313,6 +378,11 @@
     function closeCase(trackingId) {
         toastr.info('結案功能開發中');
         // TODO: Implement close case API
+    }
+
+    function exportTracking() {
+        toastr.info('匯出功能開發中');
+        // TODO: Implement CSV export
     }
 </script>
 {% endblock %}

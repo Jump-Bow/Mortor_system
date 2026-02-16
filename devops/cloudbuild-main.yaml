@@ -71,7 +71,7 @@ substitutions:
   # --- 【Shared VPC 網路設定】 ---
   _HOST_PROJECT_ID: 'cmccloud01-hostproject'
   _SHARED_VPC_NAME: 'hostproject-middleware-sharedvpc'
-  _SHARED_SUBNET_NAME: 'hostproject-sub77-serverless01'
+  _SHARED_SUBNET_NAME: 'middleware-sharedvpc-sub76'
 
   # 自動組合完整的網路與子網路路徑
   _VPC_NETWORK: 'projects/${_HOST_PROJECT_ID}/global/networks/${_SHARED_VPC_NAME}'

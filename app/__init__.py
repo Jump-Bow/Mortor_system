@@ -128,6 +128,7 @@ def register_blueprints(app: Flask) -> None:
     from app.api.Mortor_inspection import inspection_bp
     from app.api.Mortor_organizations import organizations_bp
     from app.api.Mortor_facilities import facilities_bp
+    from app.api.Mortor_aims import aims_bp
     from app.api.Mortor_users import users_bp
     from app.api.Mortor_roles import roles_bp
     from app.api.Mortor_system_logs import system_logs_bp
@@ -142,6 +143,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(tasks_bp, url_prefix='/api/v1/tasks')
     app.register_blueprint(results_bp, url_prefix='/api/v1/results')
     app.register_blueprint(inspection_bp, url_prefix='/api/v1/inspection')
+    app.register_blueprint(aims_bp, url_prefix='/api/v1/aims')
     app.register_blueprint(organizations_bp, url_prefix='/api/v1/organizations')
     app.register_blueprint(facilities_bp, url_prefix='/api/v1/facilities')
     
@@ -150,6 +152,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(tasks_bp, url_prefix='/api/tasks', name='tasks_latest')
     app.register_blueprint(results_bp, url_prefix='/api/results', name='results_latest')
     app.register_blueprint(inspection_bp, url_prefix='/api/inspection', name='inspection_latest')
+    app.register_blueprint(aims_bp, url_prefix='/api/aims', name='aims_latest')
     app.register_blueprint(organizations_bp, url_prefix='/api/organizations', name='organizations_latest')
     app.register_blueprint(facilities_bp, url_prefix='/api/facilities', name='facilities_latest')
     
@@ -167,6 +170,7 @@ def register_blueprints(app: Flask) -> None:
     csrf.exempt(tasks_bp)
     csrf.exempt(results_bp)
     csrf.exempt(inspection_bp)
+    csrf.exempt(aims_bp)
     csrf.exempt(organizations_bp)
     csrf.exempt(facilities_bp)
     csrf.exempt(users_bp)

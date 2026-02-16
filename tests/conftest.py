@@ -133,6 +133,7 @@ def equipment(session, facility):
     equipment = TEquipment(
         id='EQ001',
         name='測試設備',
+        assetid='ASSET001',
         unitid=facility.unitid,
     )
     session.add(equipment)
@@ -144,12 +145,12 @@ def equipment(session, facility):
 def equipment_check_item(session, equipment):
     """Create test equipment check item"""
     item = EquitCheckItem(
-        itemid='ITEM001',
+        item_id='ITEM001',
         equipmentid=equipment.id,
-        itemname='溫度',
-        sortorder=1,
-        ulspec='80',
-        llspec='30',
+        item_name='溫度',
+        sort_order=1,
+        max_v='80',
+        min_v='30',
     )
     session.add(item)
     session.commit()
@@ -161,10 +162,10 @@ def inspection_task(session, equipment, normal_user):
     """Create a basic inspection task"""
     task = TJob(
         actid='TASK001',
-        actkey='TASK001',
+        act_key='TASK001',
         equipmentid=equipment.id,
-        mdate=date.today(),
-        actmemid=normal_user.id,
+        mdate=date.today().strftime('%Y%m%d'),
+        act_mem_id=normal_user.id,
     )
     session.add(task)
     session.commit()

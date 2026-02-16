@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}FEM 設備保養管理系統{% endblock %}</title>
-    
+
     <!-- API Token for AJAX requests -->
     {% if session.get('api_token') %}
     <meta name="api-token" content="{{ session.get('api_token') }}">
@@ -18,339 +19,405 @@
     <!-- AdminLTE (Local) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.css') }}">
     <!-- DataTables (Local) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/datatables/dataTables.bootstrap4-1.13.6.min.css') }}">
+    <link rel="stylesheet"
+        href="{{ url_for('static', filename='vendor/datatables/dataTables.bootstrap4-1.13.6.min.css') }}">
     <!-- Select2 (Local) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/select2/select2-4.1.0-rc.0.min.css') }}">
     <!-- Toastr (Local) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/toastr/toastr.min.css') }}">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
-    
+
     {% block extra_css %}{% endblock %}
 </head>
+
 <body class="hold-transition sidebar-mini layout-fixed">
-<div class="wrapper">
+    <div class="wrapper">
 
-    <!-- Navbar -->
-    <nav class="main-header navbar navbar-expand navbar-white navbar-light">
-        <!-- Left navbar links -->
-        <ul class="navbar-nav">
-            <li class="nav-item">
-                <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
-            </li>
-            <li class="nav-item d-none d-sm-inline-block">
-                <a href="{{ url_for('web.dashboard') }}" class="nav-link">首頁</a>
-            </li>
-        </ul>
+        <!-- Navbar -->
+        <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+            <!-- Left navbar links -->
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+                </li>
+                <li class="nav-item d-none d-sm-inline-block">
+                    <a href="{{ url_for('web.dashboard') }}" class="nav-link">首頁</a>
+                </li>
+            </ul>
 
-        <!-- Right navbar links -->
-        <ul class="navbar-nav ml-auto">
-            <!-- Notifications Dropdown Menu -->
-            <li class="nav-item dropdown">
-                <a class="nav-link" data-toggle="dropdown" href="#">
-                    <i class="far fa-bell"></i>
-                    <span class="badge badge-warning navbar-badge" id="notification-count">0</span>
-                </a>
-                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
-                    <span class="dropdown-item dropdown-header">通知訊息</span>
-                    <div class="dropdown-divider"></div>
-                    <div id="notification-list">
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-info-circle mr-2"></i> 暫無通知
-                        </a>
-                    </div>
-                    <div class="dropdown-divider"></div>
-                    <a href="#" class="dropdown-item dropdown-footer">查看所有通知</a>
-                </div>
-            </li>
-            
-            <!-- User Menu -->
-            <li class="nav-item dropdown">
-                <a class="nav-link" data-toggle="dropdown" href="#">
-                    <i class="far fa-user"></i>
-                    <span class="d-none d-sm-inline-block ml-1">{{ current_user.full_name if current_user else '訪客' }}</span>
-                </a>
-                <div class="dropdown-menu dropdown-menu-sm dropdown-menu-right">
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-user mr-2"></i> 個人資料
+            <!-- Right navbar links -->
+            <ul class="navbar-nav ml-auto">
+                <!-- Notifications Dropdown Menu -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link" data-toggle="dropdown" href="#">
+                        <i class="far fa-bell"></i>
+                        <span class="badge badge-warning navbar-badge" id="notification-count">0</span>
                     </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="{{ url_for('web.logout') }}" class="dropdown-item">
-                        <i class="fas fa-sign-out-alt mr-2"></i> 登出
-                    </a>
-                </div>
-            </li>
-            
-            <li class="nav-item">
-                <a class="nav-link" data-widget="fullscreen" href="#" role="button">
-                    <i class="fas fa-expand-arrows-alt"></i>
-                </a>
-            </li>
-        </ul>
-    </nav>
-    <!-- /.navbar -->
-
-    <!-- Main Sidebar Container -->
-    <aside class="main-sidebar sidebar-dark-primary elevation-4">
-        <!-- Brand Logo -->
-        <a href="{{ url_for('web.dashboard') }}" class="brand-link">
-            <i class="fas fa-cogs brand-image"></i>
-            <span class="brand-text font-weight-light">FEM 管理系統</span>
-        </a>
-
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <!-- Sidebar user panel -->
-            <div class="user-panel mt-3 pb-3 mb-3 d-flex">
-                <div class="image">
-                    <i class="fas fa-user-circle fa-2x text-white"></i>
-                </div>
-                <div class="info">
-                    <a href="#" class="d-block">
-                        {{ current_user.full_name if current_user else '訪客' }}<br>
-                        <small class="text-muted">{{ current_user.role.role_name if current_user and current_user.role else '' }}</small>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Sidebar Menu -->
-            <nav class="mt-2">
-                <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
-                    <!-- Dashboard -->
-                    <li class="nav-item">
-                        <a href="{{ url_for('web.dashboard') }}" class="nav-link {% if request.endpoint == 'web.dashboard' %}active{% endif %}">
-                            <i class="nav-icon fas fa-tachometer-alt"></i>
-                            <p>儀表板</p>
-                        </a>
-                    </li>
-                    
-                    <!-- Inspection Management -->
-                    <li class="nav-item {% if request.endpoint and 'inspection' in request.endpoint %}menu-open{% endif %}">
-                        <a href="#" class="nav-link {% if request.endpoint and 'inspection' in request.endpoint %}active{% endif %}">
-                            <i class="nav-icon fas fa-clipboard-check"></i>
-                            <p>
-                                巡檢管理
-                                <i class="right fas fa-angle-left"></i>
-                            </p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.inspection_records') }}" class="nav-link {% if request.endpoint == 'web.inspection_records' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>巡檢紀錄查詢</p>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.abnormal_tracking') }}" class="nav-link {% if request.endpoint == 'web.abnormal_tracking' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>異常追蹤管理</p>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                    
-                    <!-- Task Management -->
-                    <li class="nav-item {% if request.endpoint and 'task' in request.endpoint %}menu-open{% endif %}">
-                        <a href="#" class="nav-link {% if request.endpoint and 'task' in request.endpoint %}active{% endif %}">
-                            <i class="nav-icon fas fa-tasks"></i>
-                            <p>
-                                任務管理
-                                <i class="right fas fa-angle-left"></i>
-                            </p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.task_list') }}" class="nav-link {% if request.endpoint == 'web.task_list' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>任務列表</p>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                    
-                    <!-- Organization Management -->
-                    <li class="nav-item {% if request.endpoint and 'organization' in request.endpoint %}menu-open{% endif %}">
-                        <a href="#" class="nav-link {% if request.endpoint and 'organization' in request.endpoint %}active{% endif %}">
-                            <i class="nav-icon fas fa-sitemap"></i>
-                            <p>
-                                組織管理
-                                <i class="right fas fa-angle-left"></i>
-                            </p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.organization_tree') }}" class="nav-link {% if request.endpoint == 'web.organization_tree' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>組織架構</p>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-
-                    <!-- Facility Management -->
-                    <li class="nav-item {% if request.endpoint and 'facility' in request.endpoint %}menu-open{% endif %}">
-                        <a href="#" class="nav-link {% if request.endpoint and 'facility' in request.endpoint %}active{% endif %}">
-                            <i class="nav-icon fas fa-building"></i>
-                            <p>
-                                設施管理
-                                <i class="right fas fa-angle-left"></i>
-                            </p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.facility_tree') }}" class="nav-link {% if request.endpoint == 'web.facility_tree' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>設施架構</p>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.facility_list') }}" class="nav-link {% if request.endpoint == 'web.facility_list' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>設施列表</p>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                    
-                    <!-- System Management -->
-                    {% if current_user and current_user.role and current_user.role.role_name == '管理者' %}
-                    <li class="nav-item {% if request.endpoint and 'system' in request.endpoint %}menu-open{% endif %}">
-                        <a href="#" class="nav-link {% if request.endpoint and 'system' in request.endpoint %}active{% endif %}">
-                            <i class="nav-icon fas fa-cog"></i>
-                            <p>
-                                系統管理
-                                <i class="right fas fa-angle-left"></i>
-                            </p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.user_management') }}" class="nav-link {% if request.endpoint == 'web.user_management' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>使用者管理</p>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.role_management') }}" class="nav-link {% if request.endpoint == 'web.role_management' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>角色管理</p>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ url_for('web.system_logs') }}" class="nav-link {% if request.endpoint == 'web.system_logs' %}active{% endif %}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>使用者日誌</p>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-            <!-- /.sidebar-menu -->
-        </div>
-        <!-- /.sidebar -->
-    </aside>
-
-    <!-- Content Wrapper -->
-    <div class="content-wrapper">
-        <!-- Content Header -->
-        <div class="content-header">
-            <div class="container-fluid">
-                <div class="row mb-2">
-                    <div class="col-sm-6">
-                        <h1 class="m-0">{% block page_title %}頁面標題{% endblock %}</h1>
-                    </div>
-                    <div class="col-sm-6">
-                        <ol class="breadcrumb float-sm-right">
-                            {% block breadcrumb %}
-                            <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">首頁</a></li>
-                            <li class="breadcrumb-item active">{% block breadcrumb_active %}當前頁面{% endblock %}</li>
-                            {% endblock %}
-                        </ol>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- /.content-header -->
-
-        <!-- Main content -->
-        <section class="content">
-            <div class="container-fluid">
-                <!-- Flash Messages -->
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                        <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'error' else 'info' }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+                        <span class="dropdown-item dropdown-header">通知訊息</span>
+                        <div class="dropdown-divider"></div>
+                        <div id="notification-list">
+                            <a href="#" class="dropdown-item">
+                                <i class="fas fa-info-circle mr-2"></i> 暫無通知
+                            </a>
                         </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-                
-                {% block content %}{% endblock %}
+                        <div class="dropdown-divider"></div>
+                        <a href="#" class="dropdown-item dropdown-footer">查看所有通知</a>
+                    </div>
+                </li>
+
+                <!-- User Menu -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link" data-toggle="dropdown" href="#">
+                        <i class="far fa-user"></i>
+                        <span class="d-none d-sm-inline-block ml-1">{{ current_user.full_name if current_user else '訪客'
+                            }}</span>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-sm dropdown-menu-right">
+                        <a href="#" class="dropdown-item">
+                            <i class="fas fa-user mr-2"></i> 個人資料
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="{{ url_for('web.logout') }}" class="dropdown-item">
+                            <i class="fas fa-sign-out-alt mr-2"></i> 登出
+                        </a>
+                    </div>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" data-widget="fullscreen" href="#" role="button">
+                        <i class="fas fa-expand-arrows-alt"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        <!-- /.navbar -->
+
+        <!-- Main Sidebar Container -->
+        <aside class="main-sidebar sidebar-dark-primary elevation-4">
+            <!-- Brand Logo -->
+            <a href="{{ url_for('web.dashboard') }}" class="brand-link">
+                <i class="fas fa-cogs brand-image"></i>
+                <span class="brand-text font-weight-light">FEM 管理系統</span>
+            </a>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Sidebar user panel -->
+                <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+                    <div class="image">
+                        <i class="fas fa-user-circle fa-2x text-white"></i>
+                    </div>
+                    <div class="info">
+                        <a href="#" class="d-block">
+                            {{ current_user.full_name if current_user else '訪客' }}<br>
+                            <small class="text-muted">{{ current_user.role.role_name if current_user and
+                                current_user.role else '' }}</small>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Sidebar Menu -->
+                <nav class="mt-2">
+                    <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
+                        data-accordion="false">
+                        <!-- Home -->
+                        <li class="nav-item">
+                            <a href="{{ url_for('web.dashboard') }}"
+                                class="nav-link {% if request.endpoint == 'web.dashboard' %}active{% endif %}">
+                                <i class="nav-icon fas fa-home"></i>
+                                <p>首頁</p>
+                            </a>
+                        </li>
+
+                        <!-- 巡檢作業管理 -->
+                        {% set inspection_endpoints = ['web.inspection_calendar', 'web.inspection_progress',
+                        'web.inspection_records', 'web.abnormal_tracking', 'web.inspection_trend',
+                        'web.inspection_comparison', 'web.aims_progress'] %}
+                        <li class="nav-item {% if request.endpoint in inspection_endpoints %}menu-open{% endif %}">
+                            <a href="#"
+                                class="nav-link {% if request.endpoint in inspection_endpoints %}active{% endif %}">
+                                <i class="nav-icon fas fa-clipboard-check"></i>
+                                <p>
+                                    巡檢作業管理
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.aims_progress') }}"
+                                        class="nav-link {% if request.endpoint == 'web.aims_progress' %}active{% endif %}">
+                                        <i class="fas fa-file-alt nav-icon"></i>
+                                        <p>AIMS工單執行進度查詢</p>
+                                    </a>
+                                </li>
+                                <!-- 暫時註解不使用
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.inspection_calendar') }}"
+                                        class="nav-link {% if request.endpoint == 'web.inspection_calendar' %}active{% endif %}">
+                                        <i class="far fa-calendar-alt nav-icon"></i>
+                                        <p>巡檢行事曆</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.inspection_progress') }}"
+                                        class="nav-link {% if request.endpoint == 'web.inspection_progress' %}active{% endif %}">
+                                        <i class="far fa-chart-bar nav-icon"></i>
+                                        <p>巡檢進度查詢</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.inspection_records') }}"
+                                        class="nav-link {% if request.endpoint == 'web.inspection_records' %}active{% endif %}">
+                                        <i class="fas fa-search nav-icon"></i>
+                                        <p>巡檢紀錄查詢</p>
+                                    </a>
+                                </li>
+                                 -->
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.abnormal_tracking') }}"
+                                        class="nav-link {% if request.endpoint == 'web.abnormal_tracking' %}active{% endif %}">
+                                        <i class="fas fa-exclamation-triangle nav-icon"></i>
+                                        <p>異常追蹤管理</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.inspection_trend') }}"
+                                        class="nav-link {% if request.endpoint == 'web.inspection_trend' %}active{% endif %}">
+                                        <i class="fas fa-chart-line nav-icon"></i>
+                                        <p>抄表趨勢圖(設備)</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.inspection_comparison') }}"
+                                        class="nav-link {% if request.endpoint == 'web.inspection_comparison' %}active{% endif %}">
+                                        <i class="fas fa-chart-bar nav-icon"></i>
+                                        <p>同性質設備趨勢比較</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Task Management  (暫時註解不使用)
+                        <li
+                            class="nav-item {% if request.endpoint and 'task' in request.endpoint %}menu-open{% endif %}">
+                            <a href="#"
+                                class="nav-link {% if request.endpoint and 'task' in request.endpoint %}active{% endif %}">
+                                <i class="nav-icon fas fa-tasks"></i>
+                                <p>
+                                    任務管理
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.task_list') }}"
+                                        class="nav-link {% if request.endpoint == 'web.task_list' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>任務列表</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        -->
+                        <!-- Organization Management -->
+                        <li
+                            class="nav-item {% if request.endpoint and 'organization' in request.endpoint %}menu-open{% endif %}">
+                            <a href="#"
+                                class="nav-link {% if request.endpoint and 'organization' in request.endpoint %}active{% endif %}">
+                                <i class="nav-icon fas fa-sitemap"></i>
+                                <p>
+                                    組織管理
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.organization_tree') }}"
+                                        class="nav-link {% if request.endpoint == 'web.organization_tree' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>組織架構</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Facility Management -->
+                        <li
+                            class="nav-item {% if request.endpoint and 'facility' in request.endpoint %}menu-open{% endif %}">
+                            <a href="#"
+                                class="nav-link {% if request.endpoint and 'facility' in request.endpoint %}active{% endif %}">
+                                <i class="nav-icon fas fa-building"></i>
+                                <p>
+                                    設施管理
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.facility_tree') }}"
+                                        class="nav-link {% if request.endpoint == 'web.facility_tree' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>設施架構</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.facility_list') }}"
+                                        class="nav-link {% if request.endpoint == 'web.facility_list' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>設施列表</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- System Management -->
+                        {% if current_user and current_user.role and current_user.role.role_name == '管理者' %}
+                        <li
+                            class="nav-item {% if request.endpoint and 'system' in request.endpoint %}menu-open{% endif %}">
+                            <a href="#"
+                                class="nav-link {% if request.endpoint and 'system' in request.endpoint %}active{% endif %}">
+                                <i class="nav-icon fas fa-cog"></i>
+                                <p>
+                                    系統管理
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.user_management') }}"
+                                        class="nav-link {% if request.endpoint == 'web.user_management' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>使用者管理</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.role_management') }}"
+                                        class="nav-link {% if request.endpoint == 'web.role_management' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>角色管理</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('web.system_logs') }}"
+                                        class="nav-link {% if request.endpoint == 'web.system_logs' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>使用者日誌</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <!-- /.sidebar-menu -->
             </div>
-        </section>
-        <!-- /.content -->
-    </div>
-    <!-- /.content-wrapper -->
+            <!-- /.sidebar -->
+        </aside>
 
-    <!-- Footer -->
-    <footer class="main-footer">
-        <strong>Copyright &copy; 2025 <a href="#">FEM 設備保養管理系統</a>.</strong>
-        All rights reserved.
-        <div class="float-right d-none d-sm-inline-block">
-            <b>Version</b> 1.0.0
+        <!-- Content Wrapper -->
+        <div class="content-wrapper">
+            <!-- Content Header -->
+            <div class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-6">
+                            <h1 class="m-0">{% block page_title %}頁面標題{% endblock %}</h1>
+                        </div>
+                        <div class="col-sm-6">
+                            <ol class="breadcrumb float-sm-right">
+                                {% block breadcrumb %}
+                                <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">首頁</a></li>
+                                <li class="breadcrumb-item active">{% block breadcrumb_active %}當前頁面{% endblock %}</li>
+                                {% endblock %}
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /.content-header -->
+
+            <!-- Main content -->
+            <section class="content">
+                <div class="container-fluid">
+                    <!-- Flash Messages -->
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'error' else 'info' }} alert-dismissible fade show"
+                        role="alert">
+                        {{ message }}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    {% endwith %}
+
+                    {% block content %}{% endblock %}
+                </div>
+            </section>
+            <!-- /.content -->
         </div>
-    </footer>
-</div>
-<!-- ./wrapper -->
+        <!-- /.content-wrapper -->
 
-<!-- jQuery (Local) -->
-<script src="{{ url_for('static', filename='vendor/jquery/jquery-3.6.0.min.js') }}"></script>
-<!-- Bootstrap 4 (Local) -->
-<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-4.6.0.bundle.min.js') }}"></script>
-<!-- AdminLTE App (Local) -->
-<script src="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.js') }}"></script>
-<!-- DataTables (Local) -->
-<script src="{{ url_for('static', filename='vendor/datatables/jquery.dataTables-1.13.6.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/datatables/dataTables.bootstrap4-1.13.6.min.js') }}"></script>
-<!-- Select2 (Local) -->
-<script src="{{ url_for('static', filename='vendor/select2/select2-4.1.0-rc.0.min.js') }}"></script>
-<!-- Chart.js (Local) -->
-<script src="{{ url_for('static', filename='vendor/chartjs/chartjs-3.9.1.min.js') }}"></script>
-<!-- Toastr (Local) -->
-<script src="{{ url_for('static', filename='vendor/toastr/toastr.min.js') }}"></script>
-<!-- Moment.js (Local) -->
-<script src="{{ url_for('static', filename='vendor/moment/moment-2.29.4.min.js') }}"></script>
+        <!-- Footer -->
+        <footer class="main-footer">
+            <strong>Copyright &copy; 2025 <a href="#">FEM 設備保養管理系統</a>.</strong>
+            All rights reserved.
+            <div class="float-right d-none d-sm-inline-block">
+                <b>Version</b> 1.0.0
+            </div>
+        </footer>
+    </div>
+    <!-- ./wrapper -->
 
-<!-- Custom JS -->
-<script>
-    // Toastr configuration
-    toastr.options = {
-        "closeButton": true,
-        "progressBar": true,
-        "positionClass": "toast-top-right",
-        "timeOut": "3000"
-    };
-    
-    // CSRF Token for AJAX requests
-    const csrfToken = '{{ csrf_token() if csrf_token else "" }}';
-    
-    // Setup AJAX defaults
-    $.ajaxSetup({
-        beforeSend: function(xhr, settings) {
-            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
-                xhr.setRequestHeader("X-CSRFToken", csrfToken);
+    <!-- jQuery (Local) -->
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery-3.6.0.min.js') }}"></script>
+    <!-- Bootstrap 4 (Local) -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-4.6.0.bundle.min.js') }}"></script>
+    <!-- AdminLTE App (Local) -->
+    <script src="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.js') }}"></script>
+    <!-- DataTables (Local) -->
+    <script src="{{ url_for('static', filename='vendor/datatables/jquery.dataTables-1.13.6.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/datatables/dataTables.bootstrap4-1.13.6.min.js') }}"></script>
+    <!-- Select2 (Local) -->
+    <script src="{{ url_for('static', filename='vendor/select2/select2-4.1.0-rc.0.min.js') }}"></script>
+    <!-- Chart.js (Local) -->
+    <script src="{{ url_for('static', filename='vendor/chartjs/chartjs-3.9.1.min.js') }}"></script>
+    <!-- Toastr (Local) -->
+    <script src="{{ url_for('static', filename='vendor/toastr/toastr.min.js') }}"></script>
+    <!-- Moment.js (Local) -->
+    <script src="{{ url_for('static', filename='vendor/moment/moment-2.29.4.min.js') }}"></script>
+
+    <!-- Custom JS -->
+    <script>
+        // Toastr configuration
+        toastr.options = {
+            "closeButton": true,
+            "progressBar": true,
+            "positionClass": "toast-top-right",
+            "timeOut": "3000"
+        };
+
+        // CSRF Token for AJAX requests
+        const csrfToken = '{{ csrf_token() if csrf_token else "" }}';
+
+        // Setup AJAX defaults
+        $.ajaxSetup({
+            beforeSend: function (xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", csrfToken);
+                }
             }
-        }
-    });
-</script>
-<script src="{{ url_for('static', filename='js/custom.js') }}"></script>
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/custom.js') }}"></script>
 
-{% block extra_js %}{% endblock %}
+    {% block extra_js %}{% endblock %}
 
 </body>
+
 </html>

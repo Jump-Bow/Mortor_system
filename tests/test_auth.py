@@ -18,7 +18,7 @@ def test_login_success(client, admin_user):
     assert data['status'] == 'success'
     assert 'token' in data['data']
     assert 'refresh_token' in data['data']
-    assert data['data']['user']['user_id'] == 'admin'
+    assert data['data']['user']['id'] == 'admin'
 
 
 def test_login_wrong_password(client, admin_user):
@@ -87,7 +87,7 @@ def test_get_current_user(client, auth_headers):
     assert response.status_code == 200
     data = response.get_json()
     assert data['status'] == 'success'
-    assert data['data']['user']['user_id'] == 'admin'
+    assert data['data']['user']['id'] == 'admin'
 
 
 def test_logout(client, auth_headers):
@@ -97,7 +97,7 @@ def test_logout(client, auth_headers):
     assert response.status_code == 200
     data = response.get_json()
     assert data['status'] == 'success'
-    assert data['message'] == '登出成功'
+    assert data['message'] == 'Successfully logged out'
 
 
 def test_refresh_token(client, admin_user):
@@ -121,3 +121,22 @@ def test_refresh_token(client, admin_user):
     data = response.get_json()
     assert data['status'] == 'success'
     assert 'token' in data['data']
+
+
+def test_logout_error_handling(client, auth_headers, monkeypatch):
+    """測試登出時發生錯誤的處理"""
+    from app.models.Mortor_system_log import UserLog
+    
+    # Mock UserLog.log_action to raise an exception
+    def mock_log_action(*args, **kwargs):
+        raise Exception("Database error during logging")
+        
+    monkeypatch.setattr(UserLog, 'log_action', mock_log_action)
+    
+    response = client.post('/api/v1/auth/logout', headers=auth_headers)
+    
+    # Expect 500 error as we catch the exception and return 500
+    assert response.status_code == 500
+    data = response.get_json()
+    assert data['status'] == 'error'
+    assert '登出過程發生錯誤' in data['message']
