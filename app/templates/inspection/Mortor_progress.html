@@ -1,0 +1,466 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}巡檢進度查詢 - FEM 設備保養管理系統{% endblock %}
+{% block page_title %}巡檢進度查詢{% endblock %}
+{% block breadcrumb_active %}巡檢進度查詢{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-radius: 8px;
+        transition: transform 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .stat-card .inner h3 {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        color: #fff;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 280px;
+    }
+
+    .filter-card .card-body {
+        padding: 15px;
+    }
+
+    .drill-link {
+        cursor: pointer;
+        color: #007bff;
+        text-decoration: underline;
+    }
+
+    .photo-thumb {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 搜尋條件 -->
+<div class="card filter-card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-filter mr-1"></i>搜尋條件</h3>
+    </div>
+    <div class="card-body">
+        <form id="search-form">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>組織 (巡檢路線/派工)</label>
+                        <select id="filter-org" class="form-control select2" style="width: 100%;">
+                            <option value="">全部組織</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>開始日期</label>
+                        <input type="date" id="filter-start-date" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>結束日期</label>
+                        <input type="date" id="filter-end-date" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-search mr-1"></i>查詢
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 統計卡片 -->
+<div class="row" id="stats-row">
+    <div class="col-lg col-6">
+        <div class="small-box stat-card bg-secondary">
+            <div class="inner">
+                <h3 id="stat-not-assigned">0</h3>
+                <p>派工 未巡檢</p>
+            </div>
+            <div class="icon"><i class="fas fa-hourglass-start"></i></div>
+        </div>
+    </div>
+    <div class="col-lg col-6">
+        <div class="small-box stat-card bg-warning">
+            <div class="inner">
+                <h3 id="stat-not-completed">0</h3>
+                <p>未完成</p>
+            </div>
+            <div class="icon"><i class="fas fa-clock"></i></div>
+        </div>
+    </div>
+    <div class="col-lg col-6">
+        <div class="small-box stat-card bg-info">
+            <div class="inner">
+                <h3 id="stat-in-progress">0</h3>
+                <p>執行中</p>
+            </div>
+            <div class="icon"><i class="fas fa-spinner"></i></div>
+        </div>
+    </div>
+    <div class="col-lg col-6">
+        <div class="small-box stat-card bg-success">
+            <div class="inner">
+                <h3 id="stat-completed">0</h3>
+                <p>已完成</p>
+            </div>
+            <div class="icon"><i class="fas fa-check-circle"></i></div>
+        </div>
+    </div>
+    <div class="col-lg col-6">
+        <div class="small-box stat-card bg-light">
+            <div class="inner">
+                <h3 id="stat-other">0</h3>
+                <p>其他</p>
+            </div>
+            <div class="icon"><i class="fas fa-ellipsis-h"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- 圖表 + 工單列表 -->
+<div class="row">
+    <!-- 圓餅圖 -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-chart-pie mr-1"></i>進度分布</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="progressPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工單列表 -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-list mr-1"></i>工單列表</h3>
+                <div class="card-tools">
+                    <span class="badge badge-info" id="result-count">0 筆</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-striped table-hover table-sm">
+                    <thead>
+                        <tr>
+                            <th>詳細</th>
+                            <th>異常</th>
+                            <th>工單號碼</th>
+                            <th>組織</th>
+                            <th>設備名稱</th>
+                            <th>狀態</th>
+                            <th>完成率</th>
+                            <th>負責人</th>
+                        </tr>
+                    </thead>
+                    <tbody id="progress-tbody">
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">請輸入搜尋條件後查詢</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <nav>
+                    <ul class="pagination pagination-sm float-right mb-0" id="pagination"></ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: 工單馬達列表 (第二層) -->
+<div class="modal fade" id="motorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-cogs mr-1"></i>工單設備列表</h5>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3"><span class="badge badge-secondary" id="modal-job-info"></span></div>
+                <table class="table table-sm table-bordered">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>設備代號</th>
+                            <th>設備名稱</th>
+                            <th>管制點</th>
+                            <th>完成率</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="motor-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: 量測資訊 (第三層) -->
+<div class="modal fade" id="measureModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="fas fa-ruler-combined mr-1"></i>量測資訊</h5>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3"><span class="badge badge-secondary" id="measure-info"></span></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>異常</th>
+                                <th>圖片</th>
+                                <th>檢查項目</th>
+                                <th>量測值</th>
+                                <th>單位</th>
+                                <th>下限值</th>
+                                <th>上限值</th>
+                                <th>量測時間</th>
+                                <th>異常原因</th>
+                                <th>處理狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody id="measure-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let pieChartInstance = null;
+
+    $(document).ready(function () {
+        $('.select2').select2({ theme: 'bootstrap4' });
+        loadOrganizations();
+
+        $('#search-form').on('submit', function (e) {
+            e.preventDefault();
+            searchProgress(1);
+        });
+    });
+
+    function loadOrganizations() {
+        $.ajax({
+            url: '/api/v1/organizations',
+            method: 'GET',
+            success: function (response) {
+                if (response.status === 'success' && response.data) {
+                    const orgs = response.data.organizations || response.data;
+                    if (Array.isArray(orgs)) {
+                        orgs.forEach(function (org) {
+                            $('#filter-org').append(`<option value="${org.id}">${org.name}</option>`);
+                        });
+                    }
+                }
+            }
+        });
+    }
+
+    function searchProgress(page) {
+        const params = {
+            org_id: $('#filter-org').val(),
+            start_date: $('#filter-start-date').val(),
+            end_date: $('#filter-end-date').val(),
+            page: page,
+            page_size: 20
+        };
+        Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
+
+        const tbody = $('#progress-tbody');
+        tbody.html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> 查詢中...</td></tr>');
+
+        $.ajax({
+            url: '/api/v1/inspection/progress',
+            method: 'GET',
+            data: params,
+            success: function (response) {
+                if (response.status === 'success') {
+                    const data = response.data;
+
+                    // 更新統計卡片
+                    if (data.statistics) {
+                        $('#stat-not-assigned').text(data.statistics.not_assigned || 0);
+                        $('#stat-not-completed').text(data.statistics.not_completed || 0);
+                        $('#stat-in-progress').text(data.statistics.in_progress || 0);
+                        $('#stat-completed').text(data.statistics.completed || 0);
+                        $('#stat-other').text(data.statistics.other || 0);
+                        updatePieChart(data.statistics);
+                    }
+
+                    // 工單列表
+                    const records = data.records || [];
+                    const pagination = data.pagination;
+                    $('#result-count').text(`${pagination.total} 筆`);
+                    tbody.empty();
+
+                    if (records.length === 0) {
+                        tbody.html('<tr><td colspan="8" class="text-center text-muted py-4">查無資料</td></tr>');
+                        return;
+                    }
+
+                    records.forEach(function (r) {
+                        const abnBadge = r.has_abnormal ?
+                            '<span class="badge badge-danger"><i class="fas fa-exclamation-circle"></i></span>' :
+                            '<span class="badge badge-success"><i class="fas fa-check"></i></span>';
+                        const statusBadge = getStatusBadge(r.status);
+                        tbody.append(`<tr>
+                        <td><button class="btn btn-xs btn-outline-primary" onclick="showMotors('${r.actid}', '${r.act_key || ''}')"><i class="fas fa-search-plus"></i></button></td>
+                        <td>${abnBadge}</td>
+                        <td>${r.act_key || '-'}</td>
+                        <td>${r.org_name || '-'}</td>
+                        <td>${r.equipment_name || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <div class="progress progress-xs"><div class="progress-bar bg-success" style="width:${r.completion_rate}%"></div></div>
+                            <small>${r.completion_rate}%</small>
+                        </td>
+                        <td>${r.act_mem || '-'}</td>
+                    </tr>`);
+                    });
+
+                    renderPagination(pagination);
+                }
+            },
+            error: function (xhr) {
+                if (xhr.status !== 401) {
+                    tbody.html('<tr><td colspan="8" class="text-center text-danger">查詢失敗</td></tr>');
+                }
+            }
+        });
+    }
+
+    function updatePieChart(stats) {
+        const ctx = document.getElementById('progressPieChart');
+        if (!ctx) return;
+        if (pieChartInstance) pieChartInstance.destroy();
+
+        pieChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['派工 未巡檢', '未完成', '執行中', '已完成', '其他'],
+                datasets: [{
+                    data: [stats.not_assigned, stats.not_completed, stats.in_progress, stats.completed, stats.other || 0],
+                    backgroundColor: ['#6c757d', '#ffc107', '#17a2b8', '#28a745', '#e9ecef']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { padding: 10 } } }
+            }
+        });
+    }
+
+    function showMotors(actid, actKey) {
+        const tbody = $('#motor-tbody');
+        tbody.html('<tr><td colspan="5" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+        $('#modal-job-info').text(actKey || actid);
+
+        $.ajax({
+            url: `/api/v1/aims/progress/${actid}`,
+            method: 'GET',
+            success: function (response) {
+                if (response.status === 'success') {
+                    const equipList = response.data.equipment_list;
+                    tbody.empty();
+                    equipList.forEach(function (e) {
+                        tbody.append(`<tr>
+                        <td>${e.id}</td>
+                        <td>${e.name}</td>
+                        <td>${e.total_items}</td>
+                        <td>
+                            <div class="progress progress-sm"><div class="progress-bar bg-info" style="width:${e.completion_rate}%"></div></div>
+                            <small>${e.completion_rate}% (${e.completed_items}/${e.total_items})</small>
+                        </td>
+                        <td><button class="btn btn-xs btn-outline-info" onclick="showMeasure('${actid}','${e.id}','${e.name}')"><i class="fas fa-ruler-combined"></i></button></td>
+                    </tr>`);
+                    });
+                    $('#motorModal').modal('show');
+                }
+            }
+        });
+    }
+
+    function showMeasure(actid, equipmentid, name) {
+        const tbody = $('#measure-tbody');
+        tbody.html('<tr><td colspan="10" class="text-center"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+        $('#measure-info').text(name);
+
+        $.ajax({
+            url: `/api/v1/aims/progress/${actid}/equipment/${equipmentid}`,
+            method: 'GET',
+            success: function (response) {
+                if (response.status === 'success') {
+                    const measurements = response.data.measurements;
+                    tbody.empty();
+                    measurements.forEach(function (m) {
+                        const isAbn = m.is_out_of_spec > 0;
+                        const abnIcon = isAbn ? '<span class="text-danger"><i class="fas fa-exclamation-triangle"></i></span>' : '<span class="text-success"><i class="fas fa-check-circle"></i></span>';
+                        const photo = m.result_photo ? `<img src="${m.result_photo}" class="photo-thumb">` : '-';
+                        const pBadge = m.is_processed ? '<span class="badge badge-success">已處理</span>' : (isAbn ? '<span class="badge badge-warning">未處理</span>' : '-');
+                        tbody.append(`<tr class="${isAbn ? 'table-danger' : ''}">
+                        <td>${abnIcon}</td><td>${photo}</td>
+                        <td>${m.item_name || '-'}</td><td><strong>${m.measured_value || '-'}</strong></td>
+                        <td>${m.unit || '-'}</td><td>${m.min_v != null ? m.min_v : '-'}</td><td>${m.max_v != null ? m.max_v : '-'}</td>
+                        <td>${m.act_time || '-'}</td><td>${m.abnormal_reason || '-'}</td><td>${pBadge}</td>
+                    </tr>`);
+                    });
+                    $('#measureModal').modal('show');
+                }
+            }
+        });
+    }
+
+    function getStatusBadge(status) {
+        const badges = { '未派工': 'badge-secondary', '執行中': 'badge-info', '已完成': 'badge-success' };
+        return `<span class="badge ${badges[status] || 'badge-secondary'}">${status}</span>`;
+    }
+
+    function renderPagination(p) {
+        const ul = $('#pagination');
+        ul.empty();
+        if (p.total_pages <= 1) return;
+        ul.append(`<li class="page-item ${p.page <= 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="searchProgress(${p.page - 1});return false;">&laquo;</a></li>`);
+        for (let i = Math.max(1, p.page - 2); i <= Math.min(p.total_pages, p.page + 2); i++) {
+            ul.append(`<li class="page-item ${i === p.page ? 'active' : ''}"><a class="page-link" href="#" onclick="searchProgress(${i});return false;">${i}</a></li>`);
+        }
+        ul.append(`<li class="page-item ${p.page >= p.total_pages ? 'disabled' : ''}"><a class="page-link" href="#" onclick="searchProgress(${p.page + 1});return false;">&raquo;</a></li>`);
+    }
+</script>
+{% endblock %}

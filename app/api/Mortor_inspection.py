@@ -327,3 +327,275 @@ def query_abnormal_tracking(**kwargs):
             'tracking_records': tracking_data
         }
     }), 200
+
+
+@inspection_bp.route('/progress', methods=['GET'])
+@token_required
+@log_request
+def query_inspection_progress(**kwargs):
+    """
+    巡檢進度查詢 - 含統計卡片資料
+    """
+    try:
+        org_id = request.args.get('org_id')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        page = request.args.get('page', 1, type=int)
+        page_size = request.args.get('page_size', 20, type=int)
+
+        query = TJob.query.join(
+            TEquipment, TJob.equipmentid == TEquipment.id, isouter=True
+        )
+
+        if org_id:
+            query = query.filter(TEquipment.unitid == org_id)
+        if start_date:
+            query = query.filter(TJob.mdate >= start_date.replace('-', ''))
+        if end_date:
+            query = query.filter(TJob.mdate <= end_date.replace('-', ''))
+
+        all_jobs = query.all()
+
+        # 統計各狀態
+        stats = {
+            'not_assigned': 0,
+            'not_completed': 0,
+            'in_progress': 0,
+            'completed': 0,
+            'other': 0
+        }
+        for job in all_jobs:
+            job_data = job.to_dict()
+            status = job_data.get('status', '')
+            if status == '未派工':
+                stats['not_assigned'] += 1
+            elif status == '未完成':
+                stats['not_completed'] += 1
+            elif status == '執行中':
+                stats['in_progress'] += 1
+            elif status == '已完成':
+                stats['completed'] += 1
+            else:
+                stats['other'] += 1
+
+        # 分頁查詢
+        total = len(all_jobs)
+        paginated_jobs = all_jobs[(page - 1) * page_size: page * page_size]
+
+        records = []
+        for job in paginated_jobs:
+            job_dict = job.to_dict()
+            has_abnormal = AbnormalCases.query.filter_by(actid=job.actid).count() > 0
+            job_dict['has_abnormal'] = has_abnormal
+            records.append(job_dict)
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'statistics': stats,
+                'records': records,
+                'pagination': {
+                    'total': total,
+                    'page': page,
+                    'page_size': page_size,
+                    'total_pages': (total + page_size - 1) // page_size
+                }
+            }
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f'Inspection progress error: {str(e)}')
+        return jsonify({
+            'status': 'error',
+            'message': f'查詢失敗: {str(e)}'
+        }), 500
+
+
+@inspection_bp.route('/trend/<equipmentid>', methods=['GET'])
+@token_required
+@log_request
+def query_equipment_trend(equipmentid, **kwargs):
+    """
+    抄表趨勢圖 - 設備歷史量測資料
+    """
+    try:
+        from app.models.Mortor_equipment import EquitCheckItem
+
+        # 取得設備的所有檢查項目
+        check_items = EquitCheckItem.query.filter_by(equipmentid=equipmentid).all()
+
+        # 取得歷史量測結果
+        results = InspectionResult.query.filter_by(
+            equipmentid=equipmentid
+        ).order_by(InspectionResult.act_time.asc()).all()
+
+        # 整理時間軸
+        dates = []
+        date_set = set()
+        for r in results:
+            if r.act_time:
+                date_str = r.act_time.strftime('%Y-%m-%d')
+                if date_str not in date_set:
+                    dates.append(date_str)
+                    date_set.add(date_str)
+
+        # 整理每個檢查項目的歷史數據
+        items_data = []
+        for item in check_items:
+            item_results = [r for r in results if r.item_id == item.item_id]
+            values = []
+            for d in dates:
+                # 找到該日期的量測值
+                val = None
+                for r in item_results:
+                    if r.act_time and r.act_time.strftime('%Y-%m-%d') == d:
+                        try:
+                            val = float(r.measured_value) if r.measured_value else None
+                        except (ValueError, TypeError):
+                            val = None
+                        break
+                values.append(val)
+
+            items_data.append({
+                'item_name': item.item_name,
+                'values': values
+            })
+
+        # 上下限
+        limits = {}
+        if check_items:
+            limits = {
+                'max_v': check_items[0].max_v,
+                'min_v': check_items[0].min_v
+            }
+
+        # 明細記錄
+        records = []
+        for r in results:
+            r_dict = r.to_dict()
+            if r.check_item:
+                r_dict['max_v'] = r.check_item.max_v
+                r_dict['min_v'] = r.check_item.min_v
+                r_dict['unit'] = r.check_item.unit
+            records.append(r_dict)
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'dates': dates,
+                'items': items_data,
+                'limits': limits,
+                'records': records
+            }
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f'Equipment trend error: {str(e)}')
+        return jsonify({
+            'status': 'error',
+            'message': f'查詢失敗: {str(e)}'
+        }), 500
+
+
+@inspection_bp.route('/comparison', methods=['GET'])
+@token_required
+@log_request
+def query_equipment_comparison(**kwargs):
+    """
+    同性質設備趨勢比較
+    """
+    try:
+        from app.models.Mortor_equipment import EquitCheckItem
+
+        org_id = request.args.get('org_id')
+        group = request.args.get('group')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        # 查詢設備
+        equip_query = TEquipment.query
+        if org_id:
+            equip_query = equip_query.filter(TEquipment.unitid == org_id)
+
+        # 透過 jobs 篩選 group
+        if group:
+            equip_ids_with_group = db.session.query(TJob.equipmentid).filter(
+                TJob.group == group
+            ).distinct().all()
+            equip_ids = [e[0] for e in equip_ids_with_group]
+            equip_query = equip_query.filter(TEquipment.id.in_(equip_ids))
+
+        equipments = equip_query.all()
+
+        equipment_list = []
+        for equip in equipments:
+            # 量測結果查詢
+            result_query = InspectionResult.query.filter_by(equipmentid=equip.id)
+            if start_date:
+                result_query = result_query.filter(
+                    InspectionResult.act_time >= datetime.strptime(start_date, '%Y-%m-%d')
+                )
+            if end_date:
+                result_query = result_query.filter(
+                    InspectionResult.act_time <= datetime.strptime(end_date + ' 23:59:59', '%Y-%m-%d %H:%M:%S')
+                )
+
+            results = result_query.all()
+
+            # 計算平均值
+            numeric_values = []
+            for r in results:
+                try:
+                    if r.measured_value:
+                        numeric_values.append(float(r.measured_value))
+                except (ValueError, TypeError):
+                    pass
+
+            avg_value = sum(numeric_values) / len(numeric_values) if numeric_values else None
+
+            # 異常次數
+            abnormal_count = sum(1 for r in results if r.is_out_of_spec and r.is_out_of_spec > 0)
+
+            # 最近量測日期
+            last_date = None
+            if results:
+                last_result = max(results, key=lambda r: r.act_time or datetime.min)
+                if last_result.act_time:
+                    last_date = last_result.act_time.strftime('%Y-%m-%d')
+
+            # 組織名稱
+            org_name = None
+            if equip.unitid:
+                org = TOrganization.query.get(equip.unitid)
+                if org:
+                    org_name = org.name
+
+            # 設備的 group
+            equip_group = None
+            job = TJob.query.filter_by(equipmentid=equip.id).first()
+            if job:
+                equip_group = job.group
+
+            equipment_list.append({
+                'id': equip.id,
+                'name': equip.name,
+                'org_name': org_name,
+                'group': equip_group,
+                'last_inspection_date': last_date,
+                'avg_value': avg_value,
+                'abnormal_count': abnormal_count
+            })
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'equipment_list': equipment_list
+            }
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f'Equipment comparison error: {str(e)}')
+        return jsonify({
+            'status': 'error',
+            'message': f'查詢失敗: {str(e)}'
+        }), 500

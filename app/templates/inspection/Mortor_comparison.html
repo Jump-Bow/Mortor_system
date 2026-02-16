@@ -1,0 +1,238 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}同性質設備趨勢比較 - FEM 設備保養管理系統{% endblock %}
+{% block page_title %}同性質設備趨勢比較{% endblock %}
+{% block breadcrumb_active %}同性質設備趨勢比較{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-card .card-body {
+        padding: 15px;
+    }
+
+    .comparison-chart-container {
+        position: relative;
+        min-height: 350px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 搜尋條件 -->
+<div class="card filter-card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-filter mr-1"></i>搜尋條件</h3>
+    </div>
+    <div class="card-body">
+        <form id="search-form">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>組織</label>
+                        <select id="filter-org" class="form-control select2" style="width: 100%;">
+                            <option value="">全部組織</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>馬達類別</label>
+                        <select id="filter-group" class="form-control">
+                            <option value="">全部</option>
+                            <option value="A">A 級</option>
+                            <option value="B">B 級</option>
+                            <option value="C">C 級</option>
+                            <option value="D">D 級</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>開始日期</label>
+                        <input type="date" id="filter-start-date" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>結束日期</label>
+                        <input type="date" id="filter-end-date" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-search mr-1"></i>查詢比較
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 比較圖表 -->
+<div class="card" id="chart-card" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-chart-bar mr-1"></i>設備比較圖</h3>
+    </div>
+    <div class="card-body">
+        <div class="comparison-chart-container">
+            <canvas id="comparisonChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- 比較列表 -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-list mr-1"></i>同性質設備比較列表</h3>
+        <div class="card-tools">
+            <span class="badge badge-info" id="result-count">0 筆</span>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>設備代號</th>
+                    <th>設備名稱</th>
+                    <th>組織</th>
+                    <th>馬達類別</th>
+                    <th>最近量測日期</th>
+                    <th>平均量測值</th>
+                    <th>異常次數</th>
+                    <th>狀態</th>
+                </tr>
+            </thead>
+            <tbody id="comparison-tbody">
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">請輸入搜尋條件後查詢</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let compChartInstance = null;
+
+    $(document).ready(function () {
+        $('.select2').select2({ theme: 'bootstrap4' });
+        loadOrganizations();
+
+        $('#search-form').on('submit', function (e) {
+            e.preventDefault();
+            searchComparison();
+        });
+    });
+
+    function loadOrganizations() {
+        $.ajax({
+            url: '/api/v1/organizations',
+            method: 'GET',
+            success: function (response) {
+                if (response.status === 'success' && response.data) {
+                    const orgs = response.data.organizations || response.data;
+                    if (Array.isArray(orgs)) {
+                        orgs.forEach(function (org) {
+                            $('#filter-org').append(`<option value="${org.id}">${org.name}</option>`);
+                        });
+                    }
+                }
+            }
+        });
+    }
+
+    function searchComparison() {
+        const params = {
+            org_id: $('#filter-org').val(),
+            group: $('#filter-group').val(),
+            start_date: $('#filter-start-date').val(),
+            end_date: $('#filter-end-date').val()
+        };
+        Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
+
+        const tbody = $('#comparison-tbody');
+        tbody.html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> 查詢中...</td></tr>');
+
+        $.ajax({
+            url: '/api/v1/inspection/comparison',
+            method: 'GET',
+            data: params,
+            success: function (response) {
+                if (response.status === 'success') {
+                    const data = response.data;
+                    const records = data.equipment_list || [];
+
+                    $('#result-count').text(`${records.length} 筆`);
+                    tbody.empty();
+
+                    if (records.length === 0) {
+                        tbody.html('<tr><td colspan="8" class="text-center text-muted py-4">查無資料</td></tr>');
+                        $('#chart-card').hide();
+                        return;
+                    }
+
+                    records.forEach(function (r) {
+                        const statusBadge = r.abnormal_count > 0 ?
+                            '<span class="badge badge-danger">有異常</span>' :
+                            '<span class="badge badge-success">正常</span>';
+                        tbody.append(`<tr>
+                        <td>${r.id}</td>
+                        <td>${r.name}</td>
+                        <td>${r.org_name || '-'}</td>
+                        <td>${r.group || '-'}</td>
+                        <td>${r.last_inspection_date || '-'}</td>
+                        <td>${r.avg_value != null ? r.avg_value.toFixed(2) : '-'}</td>
+                        <td><span class="badge ${r.abnormal_count > 0 ? 'badge-danger' : 'badge-secondary'}">${r.abnormal_count}</span></td>
+                        <td>${statusBadge}</td>
+                    </tr>`);
+                    });
+
+                    // 繪製比較圖
+                    renderComparisonChart(records);
+                }
+            },
+            error: function (xhr) {
+                if (xhr.status !== 401) {
+                    tbody.html('<tr><td colspan="8" class="text-center text-danger">查詢失敗</td></tr>');
+                }
+            }
+        });
+    }
+
+    function renderComparisonChart(records) {
+        const ctx = document.getElementById('comparisonChart');
+        if (!ctx) return;
+        if (compChartInstance) compChartInstance.destroy();
+
+        $('#chart-card').show();
+
+        compChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: records.map(r => r.name),
+                datasets: [{
+                    label: '平均量測值',
+                    data: records.map(r => r.avg_value || 0),
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }, {
+                    label: '異常次數',
+                    data: records.map(r => r.abnormal_count || 0),
+                    backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+</script>
+{% endblock %}
