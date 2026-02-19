@@ -1,5 +1,5 @@
-from app import create_app, db
-from app.models.Mortor_inspection import TJob, InspectionResult
+from app import create_app
+from app.models.Mortor_inspection import TJob
 
 app = create_app('development')
 

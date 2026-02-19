@@ -1,8 +1,7 @@
 import requests
-import json
 import sys
 import time
-from app import create_app, db
+from app import create_app
 from app.models.Mortor_system_log import SystemLog
 
 BASE_URL = 'http://localhost:4999/api'

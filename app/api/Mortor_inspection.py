@@ -5,8 +5,7 @@ Inspection API Blueprint
 from flask import Blueprint, request, jsonify, current_app
 from app import db
 from app.models.Mortor_inspection import TJob, InspectionResult
-from app.models.Mortor_equipment import TEquipment, EquitCheckItem
-from app.models.Mortor_organization import HrOrganization, TOrganization
+from app.models.Mortor_equipment import EquitCheckItem
 from app.models.Mortor_abnormal import AbnormalCases
 from app.models.Mortor_user import HrAccount
 from app.auth.jwt_handler import token_required

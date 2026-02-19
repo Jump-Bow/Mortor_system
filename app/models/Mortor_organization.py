@@ -3,7 +3,6 @@ Organization and Facility Models
 組織與設施資料模型
 """
 from app import db
-from datetime import datetime
 from typing import List, Optional
 
 

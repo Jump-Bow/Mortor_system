@@ -180,8 +180,7 @@ def register_blueprints(app: Flask) -> None:
 def register_error_handlers(app: Flask) -> None:
     """Register error handlers"""
     from app.models.Mortor_system_log import SysLog
-    import traceback
-    
+
     @app.errorhandler(400)
     def bad_request(error):
         return jsonify({

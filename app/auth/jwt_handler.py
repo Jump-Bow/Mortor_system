@@ -3,7 +3,7 @@ JWT Handler for Authentication
 JWT Token 管理與驗證
 """
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import current_app, request
 from functools import wraps
 from typing import Dict, Optional, Tuple
