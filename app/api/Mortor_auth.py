@@ -3,9 +3,8 @@ Authentication API Blueprint
 認證與授權 API
 """
 from flask import Blueprint, request, jsonify, current_app
-from app import db
 from app.models.Mortor_user import HrAccount
-from app.models.Mortor_system_log import SysLog, UserLog
+from app.models.Mortor_system_log import UserLog
 from app.auth.jwt_handler import JWTHandler, token_required
 from app.utils.decorators import validate_json, rate_limit, log_request
 from app.utils.validators import Validator

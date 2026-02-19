@@ -4,7 +4,6 @@ System Logs API Blueprint
 """
 from flask import Blueprint, request, jsonify
 from app.models.Mortor_system_log import UserLog
-from app.models.Mortor_user import HrAccount
 from app.utils.decorators import log_request, admin_required, web_or_api_required
 from datetime import datetime, timedelta
 

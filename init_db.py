@@ -10,9 +10,6 @@ from app.models.Mortor_user import HrAccount, Role
 from app.models.Mortor_organization import HrOrganization, TOrganization
 from app.models.Mortor_equipment import TEquipment, EquitCheckItem
 from app.models.Mortor_inspection import TJob, InspectionResult
-from app.models.Mortor_abnormal import AbnormalCases
-from app.models.Mortor_system_log import SysLog, UserLog
-
 
 def init_database():
     """初始化資料庫"""

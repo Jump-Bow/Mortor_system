@@ -1,6 +1,5 @@
 
 import sys
-import os
 
 # Add project root to path
 sys.path.append('/Users/edward_hsieh/Cht/Projects/Chimei/fem-admin')

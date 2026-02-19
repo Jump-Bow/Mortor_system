@@ -3,7 +3,6 @@ Inspection Related Models
 巡檢相關資料模型
 """
 from app import db
-from datetime import datetime
 
 
 class TJob(db.Model):
