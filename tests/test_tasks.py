@@ -2,8 +2,6 @@
 Tasks API Tests
 """
 from datetime import date
-
-import pytest
 from app.models.Mortor_inspection import TJob
 
 

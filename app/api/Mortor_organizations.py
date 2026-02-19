@@ -2,11 +2,10 @@
 Organizations API Blueprint
 組織管理 API
 """
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify
 from app.models.Mortor_organization import HrOrganization
 from app.auth.jwt_handler import token_required
 from app.utils.decorators import log_request
-from app.utils.validators import Validator
 
 organizations_bp = Blueprint('organizations', __name__)
 
@@ -30,7 +29,6 @@ def get_organization_tree(**kwargs):
             'organizations': tree
         }
     }), 200
-
 
 @organizations_bp.route('/list', methods=['GET'])
 @token_required

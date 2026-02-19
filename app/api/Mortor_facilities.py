@@ -3,7 +3,7 @@ Facilities API Blueprint
 設施管理 API
 """
 from flask import Blueprint, request, jsonify, current_app
-from app.models.Mortor_organization import TOrganization, HrOrganization
+from app.models.Mortor_organization import TOrganization
 from app.models.Mortor_equipment import TEquipment
 from app.auth.jwt_handler import token_required
 from app.utils.decorators import log_request

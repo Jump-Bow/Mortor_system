@@ -3,7 +3,6 @@ Equipment and Check Item Models
 設備與檢查項目資料模型
 """
 from app import db
-from datetime import datetime
 
 
 class TEquipment(db.Model):

@@ -4,7 +4,6 @@
 驗證是否包含 org_name 和 assigned_user_name 欄位
 """
 import requests
-import json
 import sys
 import os
 
