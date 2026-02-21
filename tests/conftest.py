@@ -3,7 +3,7 @@ Test Configuration
 """
 import os
 import sys
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -15,8 +15,7 @@ from app import create_app, db
 from app.models.Mortor_user import HrAccount, Role
 from app.models.Mortor_organization import HrOrganization, TOrganization
 from app.models.Mortor_equipment import TEquipment, EquitCheckItem
-from app.models.Mortor_inspection import TJob, InspectionResult
-from app.models.Mortor_abnormal import AbnormalCases
+from app.models.Mortor_inspection import TJob
 
 
 @pytest.fixture(scope='session')

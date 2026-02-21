@@ -15,9 +15,11 @@
     .select2-container .select2-selection--single {
         height: 38px !important;
     }
+
     .select2-container--default .select2-selection--single .select2-selection__rendered {
         line-height: 36px !important;
     }
+
     .select2-container--default .select2-selection--single .select2-selection__arrow {
         height: 36px !important;
     }
@@ -74,7 +76,6 @@
                             <th>設施 ID</th>
                             <th>設施名稱</th>
                             <th>類型</th>
-                            <th>所屬組織</th>
                             <th>上層設施</th>
                             <th>設備數量</th>
                             <th>操作</th>
@@ -92,116 +93,115 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
-    // Initialize Select2
-    $('.select2').select2();
+    $(document).ready(function () {
+        // Initialize Select2
+        $('.select2').select2();
 
-    // Load Organizations for Filter
-    loadOrganizations();
+        // Load Organizations for Filter
+        loadOrganizations();
 
-    // Initialize DataTable
-    var table = $('#facilities-table').DataTable({
-        "responsive": true,
-        "lengthChange": false,
-        "autoWidth": false,
-        "searching": false, // Custom search
-        "serverSide": true,
-        "processing": true,
-        "ajax": {
-            "url": "/api/v1/facilities/list",
-            "type": "GET",
-            "headers": {
-                "Authorization": "Bearer " + $('meta[name="api-token"]').attr('content')
-            },
-            "data": function(d) {
-                // Map DataTable parameters to API parameters
-                return {
-                    draw: d.draw,
-                    page: (d.start / d.length) + 1,
-                    page_size: d.length,
-                    org_id: $('#filter-org').val(),
-                    facility_type: $('#filter-type').val()
-                };
-            },
-            "dataFilter": function(data) {
-                var json = JSON.parse(data);
-                // Map API response to DataTable format
-                return JSON.stringify({
-                    "draw": json.data.draw,
-                    "recordsTotal": json.data.pagination.total,
-                    "recordsFiltered": json.data.pagination.total,
-                    "data": json.data.facilities
-                });
-            }
-        },
-        "columns": [
-            { "data": "facility_id" },
-            { "data": "facility_name" },
-            { 
-                "data": "facility_type",
-                "render": function(data, type, row) {
-                    var badges = {
-                        'Plant': 'primary',
-                        'Building': 'info',
-                        'Floor': 'success',
-                        'Area': 'warning',
-                        'Room': 'secondary',
-                        'Route': 'dark'
+        // Initialize DataTable
+        var table = $('#facilities-table').DataTable({
+            "responsive": true,
+            "lengthChange": false,
+            "autoWidth": false,
+            "searching": false, // Custom search
+            "serverSide": true,
+            "processing": true,
+            "ajax": {
+                "url": "/api/v1/facilities/list",
+                "type": "GET",
+                "headers": {
+                    "Authorization": "Bearer " + $('meta[name="api-token"]').attr('content')
+                },
+                "data": function (d) {
+                    // Map DataTable parameters to API parameters
+                    return {
+                        draw: d.draw,
+                        page: (d.start / d.length) + 1,
+                        page_size: d.length,
+                        org_id: $('#filter-org').val(),
+                        unittype: $('#filter-type').val()
                     };
-                    return '<span class="badge badge-' + (badges[data] || 'secondary') + '">' + data + '</span>';
+                },
+                "dataFilter": function (data) {
+                    var json = JSON.parse(data);
+                    // Map API response to DataTable format
+                    return JSON.stringify({
+                        "draw": json.data.draw,
+                        "recordsTotal": json.data.pagination.total,
+                        "recordsFiltered": json.data.pagination.total,
+                        "data": json.data.facilities
+                    });
                 }
             },
-            { "data": "org_name", "defaultContent": "-" },
-            { "data": "parent_facility_id", "defaultContent": "-" },
-            { "data": "equipment_count", "defaultContent": "0" },
-            {
-                "data": null,
-                "render": function(data, type, row) {
-                    return '<a href="/facility/' + row.facility_id + '" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> 查看</a>';
-                }
-            }
-        ],
-        "language": {
-            url: '/static/datatable_zh-Hant.json'
-        }
-    });
-
-    // Search Button Click
-    $('#btn-search').click(function() {
-        table.ajax.reload();
-    });
-
-    function loadOrganizations() {
-        $.ajax({
-            url: '/api/v1/organizations/tree',
-            type: 'GET',
-            headers: {
-                "Authorization": "Bearer " + $('meta[name="api-token"]').attr('content')
-            },
-            success: function(response) {
-                if (response.status === 'success') {
-                    var orgs = response.data.organizations;
-                    var select = $('#filter-org');
-                    
-                    // Helper to flatten tree for dropdown
-                    function addOptions(nodes, level) {
-                        nodes.forEach(function(node) {
-                            var prefix = level > 0 ? '&nbsp;&nbsp;'.repeat(level) + '└ ' : '';
-                            select.append(new Option(prefix + node.org_name, node.org_id));
-                            if (node.children && node.children.length > 0) {
-                                addOptions(node.children, level + 1);
-                            }
-                        });
+            "columns": [
+                { "data": "unitid" },
+                { "data": "unitname" },
+                {
+                    "data": "unittype",
+                    "render": function (data, type, row) {
+                        var badges = {
+                            'Plant': 'primary',
+                            'Building': 'info',
+                            'Floor': 'success',
+                            'Area': 'warning',
+                            'Room': 'secondary',
+                            'Route': 'dark'
+                        };
+                        return '<span class="badge badge-' + (badges[data] || 'secondary') + '">' + data + '</span>';
                     }
-                    
-                    addOptions(orgs, 0);
+                },
+                { "data": "parentunitid", "defaultContent": "-" },
+                { "data": "equipment_count", "defaultContent": "0" },
+                {
+                    "data": null,
+                    "render": function (data, type, row) {
+                        return '<a href="/facility/' + row.unitid + '" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> 查看</a>';
+                    }
                 }
-            },
-            error: function(xhr) {
-                console.error('Failed to load organizations');
+            ],
+            "language": {
+                url: '/static/datatable_zh-Hant.json'
             }
         });
-    }
-});
+
+        // Search Button Click
+        $('#btn-search').click(function () {
+            table.ajax.reload();
+        });
+
+        function loadOrganizations() {
+            $.ajax({
+                url: '/api/v1/organizations/tree',
+                type: 'GET',
+                headers: {
+                    "Authorization": "Bearer " + $('meta[name="api-token"]').attr('content')
+                },
+                success: function (response) {
+                    if (response.status === 'success') {
+                        var orgs = response.data.organizations;
+                        var select = $('#filter-org');
+
+                        // Helper to flatten tree for dropdown
+                        function addOptions(nodes, level) {
+                            nodes.forEach(function (node) {
+                                var prefix = level > 0 ? '&nbsp;&nbsp;'.repeat(level) + '└ ' : '';
+                                select.append(new Option(prefix + node.name, node.id));
+                                if (node.children && node.children.length > 0) {
+                                    addOptions(node.children, level + 1);
+                                }
+                            });
+                        }
+
+                        addOptions(orgs, 0);
+                    }
+                },
+                error: function (xhr) {
+                    console.error('Failed to load organizations');
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}

@@ -4,8 +4,7 @@ File Upload Helpers
 """
 import os
 import uuid
-from typing import Optional, Tuple
-from werkzeug.utils import secure_filename
+from typing import Tuple
 from werkzeug.datastructures import FileStorage
 from flask import current_app
 from PIL import Image

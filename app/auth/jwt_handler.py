@@ -3,7 +3,7 @@ JWT Handler for Authentication
 JWT Token 管理與驗證
 """
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import current_app, request
 from functools import wraps
 from typing import Dict, Optional, Tuple
@@ -210,7 +210,7 @@ def role_required(*allowed_roles):
             current_user = kwargs.get('current_user')
             
             if not current_user:
-                SystemLog.create(level='WARN', module='Auth')
+                SysLog.create(level='WARN', module='Auth')
                 return {
                     'status': 'error',
                     'error_code': 'FORBIDDEN',

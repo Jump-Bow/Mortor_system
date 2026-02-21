@@ -1,8 +1,6 @@
 """
 Authentication API Tests
 """
-import pytest
-from app.models.Mortor_user import HrAccount
 
 
 def test_login_success(client, admin_user):

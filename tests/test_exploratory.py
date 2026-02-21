@@ -2,11 +2,8 @@
 Exploratory Tests
 探索性測試: 包含邊界值測試、安全性測試與併發測試
 """
-import pytest
 import threading
-import time
 from app.models.Mortor_system_log import UserLog
-from app import create_app
 
 # Note: We need to import app properly.
 # The `app` fixture in conftest.py returns an app instance.

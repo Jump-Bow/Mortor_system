@@ -136,8 +136,40 @@ https://your-domain.com/api/docs
 - **巡檢查詢** (`/api/v1/inspection/*` 或 `/api/inspection/*`)
   - `GET /statistics` - 統計資料查詢
   - `GET /records` - 巡檢記錄查詢
+    - 參數:
+      - `page`: 頁碼 (預設 1)
+      - `page_size`: 每頁筆數 (預設 20)
+      - `start_date`: 開始日期 (YYYY-MM-DD)
+      - `end_date`: 結束日期 (YYYY-MM-DD)
+      - `org_id`: 組織代號
+      - `equipment_id`: 設備代號
+      - `act_key`: 任務編號 (模糊搜尋)
+      - `status`: 任務狀態 (未派工/執行中/已完成)
+      - `group`: 馬達類別
+      - `mterm`: 保養週期
+      - `has_abnormal`: 是否有異常 (true/false)
   - `GET /records/<task_id>/details` - 任務詳細記錄
+  - `GET /progress` - 巡檢進度查詢
+    - 參數:
+      - `page`: 頁碼
+      - `page_size`: 每頁筆數
+      - `start_date`: 開始日期
+      - `end_date`: 結束日期
+      - `group`: 馬達類別
+      - `mterm`: 保養週期
+      - `status`: 狀態篩選
   - `GET /abnormal/tracking` - 異常追蹤
+    - 參數:
+      - `page`: 頁碼
+      - `page_size`: 每頁筆數
+      - `start_date`: 開始日期
+      - `end_date`: 結束日期
+      - `org_id`: 組織代號
+      - `equipment_id`: 設備代號
+      - `group`: 馬達類別
+      - `mterm`: 保養週期
+      - `case_status`: 案件狀態 (未結案/已結案)
+      - `abnormal_type`: 異常類型 (異常/注意)
 
 - **系統日誌** (`/api/system-logs/*`)
   - `GET /list` - 操作日誌查詢

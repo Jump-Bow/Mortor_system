@@ -3,7 +3,6 @@ Abnormal Cases Model
 異常追蹤資料模型
 """
 from app import db
-from datetime import datetime
 
 
 class AbnormalCases(db.Model):

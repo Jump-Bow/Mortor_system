@@ -3,7 +3,6 @@ Inspection Related Models
 巡檢相關資料模型
 """
 from app import db
-from datetime import datetime
 
 
 class TJob(db.Model):
@@ -104,14 +103,14 @@ class InspectionResult(db.Model):
         
         abnormal_reason = None
         is_processed = 0
-        solution = None
+        abn_solution = None
         processed_memid = None
         processed_time = None
         
         if abnormal_case:
             abnormal_reason = abnormal_case.abn_msg
             is_processed = 1 if abnormal_case.is_processed else 0
-            solution = abnormal_case.abn_solution
+            abn_solution = abnormal_case.abn_solution
             processed_memid = abnormal_case.processed_memid
             processed_time = abnormal_case.processed_time.isoformat() if abnormal_case.processed_time else None
 
@@ -127,9 +126,9 @@ class InspectionResult(db.Model):
             'is_out_of_spec': self.is_out_of_spec,
             
             # Flattened Abnormal Fields for App
-            'abnormal_reason': abnormal_reason,
+            'abn_msg': abnormal_reason,
             'is_processed': is_processed,
-            'solution': solution,
+            'abn_solution': abn_solution,
             'processed_memid': processed_memid,
             'processed_time': processed_time
         }

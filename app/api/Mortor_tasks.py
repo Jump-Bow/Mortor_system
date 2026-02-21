@@ -4,7 +4,7 @@ Tasks API Blueprint
 """
 from flask import Blueprint, request, jsonify, current_app
 from app import db
-from app.models.Mortor_inspection import TJob, InspectionResult
+from app.models.Mortor_inspection import TJob
 from app.models.Mortor_equipment import TEquipment, EquitCheckItem
 from app.models.Mortor_user import HrAccount
 from app.auth.jwt_handler import token_required
@@ -136,7 +136,7 @@ def list_tasks(**kwargs):
     """
     取得任務列表
     """
-    current_user = kwargs.get('current_user')
+    current_user = kwargs.get('current_user')  # noqa: F841
     
     # Get filters
     start_date_str = request.args.get('start_date')
@@ -289,7 +289,7 @@ def get_task_detail(task_id, **kwargs):
     # For now, I'll return manual structure to be safe and consistent with list/download
     
     assigned_user = task.assigned_user if task.act_mem_id else None
-    equipment = task.equipment
+    equipment = task.equipment  # noqa: F841
     
     data = {
         'actid': task.actid,

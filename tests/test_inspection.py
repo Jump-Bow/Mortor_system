@@ -1,7 +1,6 @@
 """
 Inspection API Tests
 """
-import pytest
 from datetime import date, datetime
 from app.models.Mortor_inspection import TJob, InspectionResult
 from app.models.Mortor_abnormal import AbnormalCases

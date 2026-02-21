@@ -68,13 +68,6 @@ def upload_results(**kwargs):
         try:
             # Validate required fields for each result
             required_fields = ['item_id', 'measured_value', 'act_time', 'act_mem_id']
-            # Map old keys if needed
-            if 'itemid' in result_data: result_data['item_id'] = result_data.pop('itemid')
-            if 'measuredvalue' in result_data: result_data['measured_value'] = result_data.pop('measuredvalue')
-            if 'acttime' in result_data: result_data['act_time'] = result_data.pop('acttime')
-            if 'actmemid' in result_data: result_data['act_mem_id'] = result_data.pop('actmemid')
-            if 'isoutofspec' in result_data: result_data['is_out_of_spec'] = result_data.pop('isoutofspec')
-            if 'resultphoto' in result_data: result_data['result_photo'] = result_data.pop('resultphoto')
             
             error = Validator.validate_required_fields(result_data, required_fields)
             if error:

@@ -12,7 +12,6 @@
 """
 import requests
 import json
-from typing import Dict, Any
 
 # 配置
 BASE_URL = "http://localhost:5000/api/v1"
@@ -30,7 +29,7 @@ def print_response(title: str, response: requests.Response):
     print(f"{title}")
     print(f"{'=' * 60}")
     print(f"Status Code: {response.status_code}")
-    print(f"Response:")
+    print("Response:")
     print(json.dumps(response.json(), indent=2, ensure_ascii=False))
 
 
@@ -78,7 +77,7 @@ def test_organization_facilities(org_id: str, include_equipment: bool = False):
 
 def test_facilities_tree(org_id: str = None):
     """測試 4: 取得設施樹狀結構"""
-    print(f"\n📋 測試 4: 取得設施樹狀結構")
+    print("\n📋 測試 4: 取得設施樹狀結構")
     params = {}
     if org_id:
         params['org_id'] = org_id
@@ -94,7 +93,7 @@ def test_facilities_tree(org_id: str = None):
 
 def test_facilities_list(org_id: str = None, page: int = 1, page_size: int = 20):
     """測試 5: 取得設施列表"""
-    print(f"\n📋 測試 5: 取得設施列表 (分頁)")
+    print("\n📋 測試 5: 取得設施列表 (分頁)")
     params = {
         'page': page,
         'page_size': page_size
@@ -184,12 +183,12 @@ def test_relationship_integrity():
     
     # 5. 驗證關聯
     if facility_org_id == org_id:
-        print(f"\n✅ 關聯驗證成功!")
+        print("\n✅ 關聯驗證成功!")
         print(f"   組織: {first_org['org_name']} ({org_id})")
         print(f"   設施: {first_facility['facility_name']} ({facility_id})")
         print(f"   設施的 org_id: {facility_org_id}")
     else:
-        print(f"\n❌ 關聯驗證失敗!")
+        print("\n❌ 關聯驗證失敗!")
         print(f"   預期 org_id: {org_id}")
         print(f"   實際 org_id: {facility_org_id}")
 

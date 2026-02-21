@@ -5,7 +5,6 @@ System and User Log Models
 from app import db
 from datetime import datetime
 import uuid
-from flask import request
 
 
 class SysLog(db.Model):
