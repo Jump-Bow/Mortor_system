@@ -77,14 +77,18 @@ def login():
 @login_required
 def logout():
     """登出"""
-    # Log the action
-    UserActionLog.log_action(
-        user_id=current_user.id,
-        action_type='WEB_LOGOUT',
-        description=f'使用者 {current_user.id} 登出系統',
-        ip_address=request.remote_addr,
-        status='SUCCESS'
-    )
+    try:
+        # Log the action
+        UserLog.log_action(
+            user_id=current_user.id,
+            action_type='WEB_LOGOUT',
+            description=f'使用者 {current_user.id} 登出系統',
+            ip_address=request.remote_addr,
+            status='SUCCESS'
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Logout log error: {e}")
     
     # Clear session
     session.pop('api_token', None)
@@ -114,6 +118,41 @@ def inspection_records():
 def abnormal_tracking():
     """異常追蹤管理"""
     return render_template('inspection/Mortor_abnormal_tracking.html')
+
+
+@web_bp.route('/inspection/calendar')
+@login_required
+def inspection_calendar():
+    """巡檢行事曆（預留）"""
+    return render_template('inspection/Mortor_calendar.html')
+
+
+@web_bp.route('/inspection/progress')
+@login_required
+def inspection_progress():
+    """巡檢進度查詢"""
+    return render_template('inspection/Mortor_progress.html')
+
+
+@web_bp.route('/inspection/trend')
+@login_required
+def inspection_trend():
+    """抄表趨勢圖(設備)"""
+    return render_template('inspection/Mortor_trend.html')
+
+
+@web_bp.route('/inspection/comparison')
+@login_required
+def inspection_comparison():
+    """同性質設備趨勢比較"""
+    return render_template('inspection/Mortor_comparison.html')
+
+
+@web_bp.route('/aims/progress')
+@login_required
+def aims_progress():
+    """AIMS工單執行進度查詢"""
+    return render_template('inspection/Mortor_aims_progress.html')
 
 
 @web_bp.route('/task/list')

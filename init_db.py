@@ -24,7 +24,10 @@ def init_database():
             os.makedirs(directory)
             print(f"✓ Created directory: {directory}")
     
-    app = create_app('development')
+    env = os.getenv('FLASK_ENV', 'development')
+    print(f"DEBUG: Current FLASK_ENV = {env}")
+    app = create_app(env)
+    print(f"DEBUG: SQLALCHEMY_DATABASE_URI = {app.config['SQLALCHEMY_DATABASE_URI']}")
     
     with app.app_context():
         print("Dropping all tables...")

@@ -1,0 +1,290 @@
+{% extends "layout/Mortor_base.html" %}
+
+{% block title %}抄表趨勢圖(設備) - FEM 設備保養管理系統{% endblock %}
+{% block page_title %}抄表趨勢圖(設備){% endblock %}
+{% block breadcrumb_active %}抄表趨勢圖{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-container {
+        position: relative;
+        min-height: 350px;
+    }
+
+    .filter-card .card-body {
+        padding: 15px;
+    }
+
+    .equip-select-item {
+        cursor: pointer;
+        padding: 8px 12px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .equip-select-item:hover {
+        background-color: #f0f7ff;
+    }
+
+    .equip-select-item.active {
+        background-color: #007bff;
+        color: #fff;
+    }
+
+    .data-table-scroll {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 左側: 設備選擇 -->
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-cogs mr-1"></i>選擇設備</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="p-2">
+                    <select id="filter-org" class="form-control select2 mb-2" style="width: 100%;">
+                        <option value="">全部組織</option>
+                    </select>
+                    <input type="text" id="equip-search" class="form-control form-control-sm" placeholder="搜尋設備名稱...">
+                </div>
+                <div id="equip-list" style="max-height: 500px; overflow-y: auto;">
+                    <div class="text-center text-muted py-3">載入中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右側: 趨勢圖 + 資料表 -->
+    <div class="col-lg-9">
+        <div class="card" id="trend-card" style="display: none;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-line mr-1"></i>
+                    <span id="trend-title">趨勢圖</span>
+                </h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="data-card" style="display: none;">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-table mr-1"></i>量測資料</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="data-table-scroll">
+                    <table class="table table-sm table-striped table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>檢查項目</th>
+                                <th>量測值</th>
+                                <th>單位</th>
+                                <th>下限值</th>
+                                <th>上限值</th>
+                                <th>異常</th>
+                                <th>量測時間</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="no-selection" class="text-center py-5">
+            <i class="fas fa-hand-pointer fa-3x text-muted mb-3"></i>
+            <p class="text-muted">請從左側選擇一個設備來查看趨勢圖</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let trendChartInstance = null;
+
+    $(document).ready(function () {
+        $('.select2').select2({ theme: 'bootstrap4' });
+        loadOrganizations();
+        loadEquipments();
+
+        $('#filter-org').on('change', loadEquipments);
+        $('#equip-search').on('input', filterEquipments);
+    });
+
+    function loadOrganizations() {
+        $.ajax({
+            url: '/api/v1/organizations',
+            method: 'GET',
+            success: function (response) {
+                if (response.status === 'success' && response.data) {
+                    const orgs = response.data.organizations || response.data;
+                    if (Array.isArray(orgs)) {
+                        orgs.forEach(function (org) {
+                            $('#filter-org').append(`<option value="${org.id}">${org.name}</option>`);
+                        });
+                    }
+                }
+            }
+        });
+    }
+
+    function loadEquipments() {
+        const orgId = $('#filter-org').val();
+        const params = orgId ? { org_id: orgId } : {};
+
+        $.ajax({
+            url: '/api/v1/facilities',
+            method: 'GET',
+            data: params,
+            success: function (response) {
+                if (response.status === 'success') {
+                    const list = $('#equip-list');
+                    const equipments = response.data.facilities || response.data || [];
+                    list.empty();
+
+                    if (equipments.length === 0) {
+                        list.html('<div class="text-center text-muted py-3">無設備資料</div>');
+                        return;
+                    }
+
+                    equipments.forEach(function (e) {
+                        list.append(`<div class="equip-select-item" data-id="${e.id}" data-name="${e.name}" onclick="selectEquipment('${e.id}', '${e.name}')">
+                        <i class="fas fa-cog mr-1 text-muted"></i>${e.name}
+                        <br><small class="text-muted">${e.id}</small>
+                    </div>`);
+                    });
+                }
+            },
+            error: function () {
+                $('#equip-list').html('<div class="text-center text-danger py-3">載入失敗</div>');
+            }
+        });
+    }
+
+    function filterEquipments() {
+        const keyword = $('#equip-search').val().toLowerCase();
+        $('.equip-select-item').each(function () {
+            const name = $(this).data('name').toLowerCase();
+            $(this).toggle(name.includes(keyword));
+        });
+    }
+
+    function selectEquipment(equipId, equipName) {
+        // 高亮選取
+        $('.equip-select-item').removeClass('active');
+        $(`.equip-select-item[data-id="${equipId}"]`).addClass('active');
+
+        $('#no-selection').hide();
+        $('#trend-card, #data-card').show();
+        $('#trend-title').text(`${equipName} — 量測趨勢圖`);
+
+        // 載入趨勢資料
+        $.ajax({
+            url: `/api/v1/inspection/trend/${equipId}`,
+            method: 'GET',
+            success: function (response) {
+                if (response.status === 'success') {
+                    renderTrendChart(response.data);
+                    renderDataTable(response.data);
+                }
+            },
+            error: function (xhr) {
+                if (xhr.status !== 401) {
+                    toastr.error('載入趨勢資料失敗');
+                }
+            }
+        });
+    }
+
+    function renderTrendChart(data) {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx) return;
+        if (trendChartInstance) trendChartInstance.destroy();
+
+        const items = data.items || [];
+        const dates = data.dates || [];
+
+        const colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#fd7e14', '#20c997'];
+
+        const datasets = items.map(function (item, idx) {
+            return {
+                label: item.item_name,
+                data: item.values,
+                borderColor: colors[idx % colors.length],
+                backgroundColor: 'transparent',
+                tension: 0.3,
+                pointRadius: 3
+            };
+        });
+
+        // 上下限參考線
+        if (data.limits) {
+            if (data.limits.max_v != null) {
+                datasets.push({
+                    label: '上限值',
+                    data: Array(dates.length).fill(data.limits.max_v),
+                    borderColor: '#dc3545',
+                    borderDash: [5, 5],
+                    backgroundColor: 'transparent',
+                    pointRadius: 0
+                });
+            }
+            if (data.limits.min_v != null) {
+                datasets.push({
+                    label: '下限值',
+                    data: Array(dates.length).fill(data.limits.min_v),
+                    borderColor: '#ffc107',
+                    borderDash: [5, 5],
+                    backgroundColor: 'transparent',
+                    pointRadius: 0
+                });
+            }
+        }
+
+        trendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels: dates, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { y: { beginAtZero: false } }
+            }
+        });
+    }
+
+    function renderDataTable(data) {
+        const tbody = $('#data-tbody');
+        tbody.empty();
+
+        const records = data.records || [];
+        records.forEach(function (r) {
+            const isAbn = r.is_out_of_spec > 0;
+            const abnIcon = isAbn ? '<span class="text-danger"><i class="fas fa-exclamation-triangle"></i></span>' : '<span class="text-success"><i class="fas fa-check-circle"></i></span>';
+            tbody.append(`<tr class="${isAbn ? 'table-danger' : ''}">
+            <td>${r.item_name || '-'}</td>
+            <td><strong>${r.measured_value || '-'}</strong></td>
+            <td>${r.unit || '-'}</td>
+            <td>${r.min_v != null ? r.min_v : '-'}</td>
+            <td>${r.max_v != null ? r.max_v : '-'}</td>
+            <td>${abnIcon}</td>
+            <td>${r.act_time || '-'}</td>
+        </tr>`);
+        });
+    }
+</script>
+{% endblock %}

@@ -840,7 +840,7 @@ def print_summary(results: Dict[str, SyncResult]) -> None:
         print(f"  錯誤: {result.error_count} 筆")
         
         if result.errors:
-            print(f"  錯誤詳情:")
+            print("  錯誤詳情:")
             for error in result.errors[:5]:  # 只顯示前 5 個錯誤
                 print(f"    - {error}")
             if len(result.errors) > 5:

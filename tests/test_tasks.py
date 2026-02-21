@@ -8,18 +8,30 @@ from app.models.Mortor_inspection import TJob
 def test_download_tasks(client, auth_headers, session, equipment, equipment_check_item, normal_user):
     """測試下載任務"""
     task = TJob(
-        actid='TASK_DOWNLOAD_001',
-        actkey='TASK001',
+        actid='TASK001',
+        act_key='TASK001',
         equipmentid=equipment.id,
-        actmemid=normal_user.id,
-        mdate=date.today(),
+        act_mem_id=normal_user.id,
+        mdate=date.today().strftime('%Y%m%d'),
     )
     session.add(task)
     session.commit()
     
+    # Login as normal_user to get token
+    login_resp = client.post('/api/v1/auth/login', json={
+        'username': normal_user.id,
+        'password': 'password123',
+        'login_type': 'local'
+    })
+    token = login_resp.get_json()['data']['token']
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
     response = client.get(
         f'/api/v1/tasks/download?user_id={normal_user.id}',
-        headers=auth_headers
+        headers=headers
     )
     
     assert response.status_code == 200
@@ -33,21 +45,21 @@ def test_download_tasks(client, auth_headers, session, equipment, equipment_chec
         assert isinstance(first['equipment_check_items'], list)
 
 
-def test_list_tasks(client, auth_headers, session, equipment, equipment_check_item, admin_user):
+def test_list_tasks(client, auth_headers, session, equipment, equipment_check_item, admin_user, normal_user):
     """測試任務列表"""
     task1 = TJob(
         actid='TASK_LIST_001',
-        actkey='TASK001',
+        act_key='TASK001',
         equipmentid=equipment.id,
-        actmemid=admin_user.id,
-        mdate=date.today(),
+        act_mem_id=admin_user.id,
+        mdate=date.today().strftime('%Y%m%d'),
     )
     task2 = TJob(
-        actid='TASK_LIST_002',
-        actkey='TASK002',
+        actid='TASK002',
+        act_key='TASK002',
         equipmentid=equipment.id,
-        actmemid=admin_user.id,
-        mdate=date.today(),
+        act_mem_id=normal_user.id,
+        mdate=date.today().strftime('%Y%m%d'),
     )
     session.add_all([task1, task2])
     session.commit()
@@ -65,10 +77,10 @@ def test_get_task_detail(client, auth_headers, session, equipment, admin_user):
     """測試取得任務詳情"""
     task = TJob(
         actid='TASK_DETAIL_001',
-        actkey='TASK001',
+        act_key='TASK001',
         equipmentid=equipment.id,
-        actmemid=admin_user.id,
-        mdate=date.today(),
+        act_mem_id=admin_user.id,
+        mdate=date.today().strftime('%Y%m%d'),
     )
     session.add(task)
     session.commit()
@@ -81,7 +93,7 @@ def test_get_task_detail(client, auth_headers, session, equipment, admin_user):
     assert response.status_code == 200
     data = response.get_json()
     assert data['status'] == 'success'
-    assert data['data']['task']['actkey'] == 'TASK001'
+    assert data['data']['task']['act_key'] == 'TASK001'
 
 
 def test_list_tasks_with_filters(client, auth_headers, session, equipment, admin_user):
@@ -89,10 +101,10 @@ def test_list_tasks_with_filters(client, auth_headers, session, equipment, admin
     for i in range(5):
         task = TJob(
             actid=f'TASK_FILTER_{i}',
-            actkey=f'TASK00{i}',
+            act_key=f'TASK00{i}',
             equipmentid=equipment.id,
-            actmemid=admin_user.id,
-            mdate=date.today(),
+            act_mem_id=admin_user.id,
+            mdate=date.today().strftime('%Y%m%d'),
         )
         session.add(task)
     session.commit()

@@ -21,25 +21,66 @@
                     <div class="row">
                         <div class="col-md-3">
                             <div class="form-group">
-                                <label>開始日期</label>
-                                <input type="date" class="form-control" id="start-date" name="start_date">
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>結束日期</label>
-                                <input type="date" class="form-control" id="end-date" name="end_date">
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
                                 <label>組織</label>
                                 <select class="form-control select2" id="org-filter" name="org_id">
                                     <option value="">全部組織</option>
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>開始日期</label>
+                                <input type="date" class="form-control" id="start-date" name="start_date">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>結束日期</label>
+                                <input type="date" class="form-control" id="end-date" name="end_date">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>馬達類別</label>
+                                <select class="form-control" id="group-filter" name="group">
+                                    <option value="">全部</option>
+                                    <option value="A">A 級</option>
+                                    <option value="B">B 級</option>
+                                    <option value="C">C 級</option>
+                                    <option value="D">D 級</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>保養週期</label>
+                                <select class="form-control" id="mterm-filter" name="mterm">
+                                    <option value="">全部</option>
+                                    <option value="1M">每月 (1M)</option>
+                                    <option value="3M">每季 (3M)</option>
+                                    <option value="6M">半年 (6M)</option>
+                                    <option value="1Y">每年 (1Y)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <div class="form-group mb-0 w-100">
+                                <button type="button" class="btn btn-primary btn-block" onclick="searchRecords()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
                         <div class="col-md-3">
+                            <div class="form-group">
+                                <label>設備</label>
+                                <select class="form-control select2" id="equipment-filter" name="equipment_id">
+                                    <option value="">全部設備</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label>狀態</label>
                                 <select class="form-control" id="status-filter" name="status">
@@ -50,9 +91,7 @@
                                 </select>
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label>異常篩選</label>
                                 <select class="form-control" id="abnormal-filter" name="has_abnormal">
@@ -62,20 +101,21 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-9">
+                        <div class="col-md-3">
                             <div class="form-group">
-                                <label>&nbsp;</label>
-                                <div>
-                                    <button type="button" class="btn btn-primary" onclick="searchRecords()">
-                                        <i class="fas fa-search"></i> 查詢
-                                    </button>
-                                    <button type="button" class="btn btn-secondary" onclick="resetFilters()">
-                                        <i class="fas fa-redo"></i> 重置
-                                    </button>
-                                    <button type="button" class="btn btn-success" onclick="exportRecords()">
-                                        <i class="fas fa-file-export"></i> 匯出
-                                    </button>
-                                </div>
+                                <label>工單號碼</label>
+                                <input type="text" class="form-control" id="act-key-filter" name="act_key"
+                                    placeholder="輸入工單號碼...">
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <div class="form-group mb-0">
+                                <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+                                    <i class="fas fa-redo"></i> 重置
+                                </button>
+                                <button type="button" class="btn btn-success" onclick="exportRecords()">
+                                    <i class="fas fa-file-export"></i> 匯出
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -98,6 +138,8 @@
                             <th>任務編號</th>
                             <th>組織</th>
                             <th>設備名稱</th>
+                            <th>馬達類別</th>
+                            <th>保養週期</th>
                             <th>檢查日期</th>
                             <th>檢查人員</th>
                             <th>狀態</th>
@@ -140,49 +182,68 @@
 
 {% block extra_js %}
 <script>
-let inspectionTable;
+    let inspectionTable;
 
-$(document).ready(function() {
-    // Initialize Select2
-    $('.select2').select2({
-        theme: 'bootstrap4'
+    $(document).ready(function () {
+        // Initialize Select2
+        $('.select2').select2({
+            theme: 'bootstrap4'
+        });
+
+        // Load organizations & equipment
+        loadOrganizations();
+        loadEquipment();
+
+        // Set default date range (last 30 days)
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+
+        $('#end-date').val(today.toISOString().split('T')[0]);
+        $('#start-date').val(thirtyDaysAgo.toISOString().split('T')[0]);
+
+        // Initialize DataTable
+        initDataTable();
+
+        // Load data
+        searchRecords();
     });
-    
-    // Load organizations
-    loadOrganizations();
-    
-    // Set default date range (last 30 days)
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    
-    $('#end-date').val(today.toISOString().split('T')[0]);
-    $('#start-date').val(thirtyDaysAgo.toISOString().split('T')[0]);
-    
-    // Initialize DataTable
-    initDataTable();
-    
-    // Load data
-    searchRecords();
-});
 
-function loadOrganizations() {
-    $.ajax({
-        url: '/api/v1/organizations/list',
-        method: 'GET',
-        headers: {
-            'Authorization': 'Bearer ' + localStorage.getItem('token')
-        },
-        success: function(response) {
-            if (response.status === 'success') {
-                const select = $('#org-filter');
-                response.data.organizations.forEach(function(org) {
-                    select.append(`<option value="${org.org_id}">${org.org_name}</option>`);
-                });
+    function loadOrganizations() {
+        $.ajax({
+            url: '/api/v1/organizations/list',
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            success: function (response) {
+                if (response.status === 'success') {
+                    const select = $('#org-filter');
+                    response.data.organizations.forEach(function (org) {
+                        select.append(`<option value="${org.id}">${org.name}</option>`);
+                    });
+                }
             }
-        }
-    });
-}
+        });
+    }
+
+    function loadEquipment() {
+        $.ajax({
+            url: '/api/v1/facilities/equipment/all',
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            success: function (response) {
+                if (response.status === 'success') {
+                    const select = $('#equipment-filter');
+                    (response.data.equipment || []).forEach(function (eq) {
+                        select.append(`<option value="${eq.id}">${eq.name}</option>`);
+                    });
+                }
+            }
+        });
+    }
 
     function initDataTable() {
         inspectionTable = $('#inspectionTable').DataTable({
@@ -193,11 +254,13 @@ function loadOrganizations() {
                 { data: 'act_key' },
                 { data: 'org_name', defaultContent: '-' },
                 { data: 'equipment_name', defaultContent: '-' },
+                { data: 'group', defaultContent: '-' },
+                { data: 'mterm', defaultContent: '-' },
                 { data: 'mdate' },
                 { data: 'act_mem', defaultContent: '-' },
                 {
                     data: 'status',
-                    render: function(data) {
+                    render: function (data) {
                         const badges = {
                             '未派工': 'badge-secondary',
                             '執行中': 'badge-info',
@@ -209,15 +272,15 @@ function loadOrganizations() {
                 },
                 {
                     data: 'has_abnormal',
-                    render: function(data) {
-                        return data ? 
-                            '<span class="badge badge-danger">有</span>' : 
+                    render: function (data) {
+                        return data ?
+                            '<span class="badge badge-danger">有</span>' :
                             '<span class="badge badge-success">無</span>';
                     }
                 },
                 {
                     data: 'completion_rate',
-                    render: function(data) {
+                    render: function (data) {
                         const rate = data || 0;
                         return `
                             <div class="progress progress-xs">
@@ -230,7 +293,7 @@ function loadOrganizations() {
                 {
                     data: null,
                     orderable: false,
-                    render: function(data, type, row) {
+                    render: function (data, type, row) {
                         return `
                             <button class="btn btn-sm btn-info" onclick="viewDetail('${row.actid}')">
                                 <i class="fas fa-eye"></i> 詳情
@@ -242,23 +305,23 @@ function loadOrganizations() {
             language: {
                 url: '/static/datatable_zh-Hant.json'
             },
-            order: [[3, 'desc']]
+            order: [[5, 'desc']]
         });
     }
-    
+
     function searchRecords() {
         const formData = $('#filterForm').serializeArray();
         const params = {};
-        
-        formData.forEach(function(item) {
+
+        formData.forEach(function (item) {
             if (item.value) {
                 params[item.name] = item.value;
             }
         });
-        
+
         params.page = 1;
         params.page_size = 1000;
-        
+
         $.ajax({
             url: '/api/v1/inspection/records',
             method: 'GET',
@@ -266,38 +329,38 @@ function loadOrganizations() {
             headers: {
                 'Authorization': 'Bearer ' + localStorage.getItem('token')
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.status === 'success') {
                     inspectionTable.clear();
                     inspectionTable.rows.add(response.data.records);
                     inspectionTable.draw();
-                    
+
                     toastr.success(`查詢到 ${response.data.total} 筆紀錄`);
                 }
             },
-            error: function(xhr) {
-                if (xhr.status === 401) {
-                    window.location.href = '/login';
-                } else {
-                    toastr.error('查詢失敗');
+            error: function (xhr) {
+                // 401 由全域 setupAjaxErrorHandler 統一處理（自動刷新 token）
+                if (xhr.status !== 401) {
+                    toastr.error('查詢失敗: ' + (xhr.responseJSON?.message || '未知錯誤'));
                 }
             }
         });
     }
-    
+
     function resetFilters() {
         $('#filterForm')[0].reset();
         const today = new Date();
         const thirtyDaysAgo = new Date(today);
         thirtyDaysAgo.setDate(today.getDate() - 30);
-        
+
         $('#end-date').val(today.toISOString().split('T')[0]);
         $('#start-date').val(thirtyDaysAgo.toISOString().split('T')[0]);
         $('#org-filter').val('').trigger('change');
-        
+        $('#equipment-filter').val('').trigger('change');
+
         searchRecords();
     }
-    
+
     function viewDetail(taskId) {
         $('#detailModal').modal('show');
         $('#detailModalBody').html(`
@@ -306,28 +369,28 @@ function loadOrganizations() {
                 <p class="mt-2">載入中...</p>
             </div>
         `);
-        
+
         $.ajax({
             url: `/api/v1/inspection/records/${taskId}/details`,
             method: 'GET',
             headers: {
                 'Authorization': 'Bearer ' + localStorage.getItem('token')
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.status === 'success') {
                     renderDetailView(response.data);
                 }
             },
-            error: function() {
+            error: function () {
                 $('#detailModalBody').html('<div class="alert alert-danger">載入失敗</div>');
             }
         });
     }
-    
+
     function renderDetailView(data) {
         const task = data.task;
         const equipmentList = data.equipment_list || [];
-        
+
         let html = `
             <div class="card">
                 <div class="card-header">
@@ -351,11 +414,11 @@ function loadOrganizations() {
             
             <div class="accordion" id="equipmentAccordion">
         `;
-        
-        equipmentList.forEach(function(eq, index) {
+
+        equipmentList.forEach(function (eq, index) {
             const equipmentName = eq.name; // TEquipment.to_dict uses 'name'
             const checkItems = eq.check_items || [];
-            
+
             html += `
                 <div class="card">
                     <div class="card-header" id="heading${index}">
@@ -383,8 +446,8 @@ function loadOrganizations() {
                                 </thead>
                                 <tbody>
             `;
-            
-            checkItems.forEach(function(item) {
+
+            checkItems.forEach(function (item) {
                 const result = item.result;
                 html += `
                     <tr>
@@ -394,16 +457,16 @@ function loadOrganizations() {
                         <td>${item.max_v !== null ? item.max_v : '-'}</td>
                         <td>${result ? result.measured_value || '-' : '-'}</td>
                         <td>
-                            ${result ? (result.is_out_of_spec >= 2 ? 
-                                '<span class="badge badge-danger">異常</span>' : 
-                                '<span class="badge badge-success">正常</span>') : 
-                                '<span class="badge badge-secondary">未檢查</span>'}
+                            ${result ? (result.is_out_of_spec >= 2 ?
+                        '<span class="badge badge-danger">異常</span>' :
+                        '<span class="badge badge-success">正常</span>') :
+                        '<span class="badge badge-secondary">未檢查</span>'}
                         </td>
                         <td>${result && result.act_time ? new Date(result.act_time).toLocaleString('zh-TW') : '-'}</td>
                     </tr>
                 `;
             });
-            
+
             html += `
                                 </tbody>
                             </table>
@@ -412,12 +475,12 @@ function loadOrganizations() {
                 </div>
             `;
         });
-        
+
         html += '</div>';
-        
+
         $('#detailModalBody').html(html);
     }
-    
+
     function exportRecords() {
         toastr.info('匯出功能開發中');
     }

@@ -114,16 +114,27 @@ def logout(**kwargs):
     
     Note: JWT 是無狀態的，實際登出需要前端刪除 token
     """
-    current_user_id = JWTHandler.get_jwt_identity() # Changed from get_jwt_identity() to JWTHandler.get_jwt_identity()
-    
-    UserLog.log_action( # Changed from UserLog.log_action to UserActionLog.log_action
-        user_id=current_user_id,
-        action_type='LOGOUT',
-        description='User logged out',
-        ip_address=request.remote_addr
-    )
-    
-    return jsonify({'message': 'Successfully logged out'}), 200   
+    try:
+        current_user = kwargs.get('current_user')
+        current_user_id = current_user.id if current_user else 'Unknown'
+        
+        UserLog.log_action(
+            user_id=current_user_id,
+            action_type='LOGOUT',
+            description='User logged out',
+            ip_address=request.remote_addr
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Successfully logged out'
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f"Logout error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': '登出過程發生錯誤'
+        }), 500   
     # The following lines were part of the original response and are now replaced by the new return statement.
     # return jsonify({
     #     'status': 'success',

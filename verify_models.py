@@ -5,10 +5,9 @@ import sys
 sys.path.append('/Users/edward_hsieh/Cht/Projects/Chimei/fem-admin')
 
 try:
-    from app import create_app, db
+    from app import create_app
     from app.models import (
-        User, Role, Organization, Facility, Equipment, EquipmentCheckItem,
-        InspectionTask, InspectionResult, AbnormalTracking, SystemLog, UserLog
+        SystemLog, UserLog
     )
     
     print("Successfully imported all models.")

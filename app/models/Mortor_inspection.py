@@ -51,19 +51,19 @@ class TJob(db.Model):
             'actid': self.actid,
             'equipmentid': self.equipmentid,
             'equipment_name': self.equipment.name if self.equipment else None,
-            'mdate': self.mdate, # already a string or date? Model says String(8).
+            'mdate': self.mdate,
             'act_desc': self.act_desc,
             'act_key': self.act_key,
             'act_mem_id': self.act_mem_id,
             'act_mem': self.act_mem,
-            'act_mem_name': self.act_mem, # Alias for App compatibility
+            'act_mem_name': self.act_mem,
             'org_name': self.assigned_user.organization.name if self.assigned_user and self.assigned_user.organization else None,
             'group': self.group,
             'mterm': self.mterm,
             'status': status,
             'completion_rate': round(completion_rate, 1),
-            'total_items': total_items,     # For App Progress Bar
-            'completed_items': completed_items # For App Progress Bar
+            'total_items': total_items,
+            'completed_items': completed_items
         }
         
         if include_results:
@@ -94,7 +94,6 @@ class InspectionResult(db.Model):
 
     def to_dict(self):
         # Fetch associated abnormal case if any
-        # Avoid circular import by importing here
         from app.models.Mortor_abnormal import AbnormalCases
         
         abnormal_case = AbnormalCases.query.filter_by(
@@ -103,15 +102,15 @@ class InspectionResult(db.Model):
         ).first()
         
         abnormal_reason = None
-        is_processed = 0 # Default to 0 (False)
-        solution = None
+        is_processed = 0
+        abn_solution = None
         processed_memid = None
         processed_time = None
         
         if abnormal_case:
             abnormal_reason = abnormal_case.abn_msg
             is_processed = 1 if abnormal_case.is_processed else 0
-            solution = abnormal_case.abn_solution
+            abn_solution = abnormal_case.abn_solution
             processed_memid = abnormal_case.processed_memid
             processed_time = abnormal_case.processed_time.isoformat() if abnormal_case.processed_time else None
 
@@ -127,9 +126,9 @@ class InspectionResult(db.Model):
             'is_out_of_spec': self.is_out_of_spec,
             
             # Flattened Abnormal Fields for App
-            'abnormal_reason': abnormal_reason,
+            'abn_msg': abnormal_reason,
             'is_processed': is_processed,
-            'solution': solution,
+            'abn_solution': abn_solution,
             'processed_memid': processed_memid,
             'processed_time': processed_time
         }

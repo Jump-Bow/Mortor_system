@@ -23,20 +23,18 @@ def test_get_dashboard_statistics(client, auth_headers, session):
     assert 'accumulated_attention_open' in abnormal
     
     tasks = data['data']['inspection_tasks']
-    assert 'not_assigned' in tasks
-    assert 'not_completed' in tasks
-    assert 'in_progress' in tasks
-    assert 'completed' in tasks
+    assert 'total_tasks_today' in tasks
+    assert 'completed_today' in tasks
 
 
 def test_query_inspection_records(client, auth_headers, session, equipment, admin_user):
     """測試查詢巡檢紀錄"""
     task = TJob(
         actid='TASK_REC_001',
-        actkey='TASK001',
+        act_key='TASK001',
         equipmentid=equipment.id,
-        actmemid=admin_user.id,
-        mdate=date.today(),
+        act_mem_id=admin_user.id,
+        mdate=date.today().strftime('%Y%m%d'),
     )
     session.add(task)
     session.commit()
@@ -61,22 +59,22 @@ def test_get_inspection_record_details(
     """測試取得巡檢紀錄詳細資訊"""
     task = TJob(
         actid='TASK_REC_DETAIL_001',
-        actkey='TASK001',
+        act_key='TASK001',
         equipmentid=equipment.id,
-        actmemid=admin_user.id,
-        mdate=date.today(),
+        act_mem_id=admin_user.id,
+        mdate=date.today().strftime('%Y%m%d'),
     )
     session.add(task)
     session.commit()
     
     result = InspectionResult(
         actid=task.actid,
-        itemid=equipment_check_item.itemid,
+        item_id=equipment_check_item.item_id,
         equipmentid=equipment.id,
-        measuredvalue='65.5',
-        isoutofspec=1,  # 正常
-        acttime=datetime.utcnow(),
-        actmemid=admin_user.id
+        measured_value='65.5',
+        is_out_of_spec=1,  # 正常
+        act_time=datetime.utcnow(),
+        act_mem_id=admin_user.id
     )
     session.add(result)
     session.commit()
@@ -109,33 +107,33 @@ def test_query_abnormal_tracking(
     """測試異常追蹤查詢"""
     task = TJob(
         actid='TASK_ABN_001',
-        actkey='TASK001',
+        act_key='TASK001',
         equipmentid=equipment.id,
-        actmemid=admin_user.id,
-        mdate=date.today(),
+        act_mem_id=admin_user.id,
+        mdate=date.today().strftime('%Y%m%d'),
     )
     session.add(task)
     session.commit()
     
     result = InspectionResult(
         actid=task.actid,
-        itemid=equipment_check_item.itemid,
+        item_id=equipment_check_item.item_id,
         equipmentid=equipment.id,
-        measuredvalue='95.0',
-        isoutofspec=2,  # 異常
-        acttime=datetime.utcnow(),
-        actmemid=admin_user.id
+        measured_value='95.0',
+        is_out_of_spec=2,  # 異常
+        act_time=datetime.utcnow(),
+        act_mem_id=admin_user.id
     )
     session.add(result)
     session.commit()
     
     tracking = AbnormalCases(
         actid=result.actid,
-        itemid=result.itemid,
+        item_id=result.item_id,
         equipmentid=equipment.id,
-        measuredvalue=result.measuredvalue,
-        isprocessed=False,
-        abnsolution='尚未處理',
+        measured_value=result.measured_value,
+        is_processed=False,
+        abn_solution='尚未處理',
     )
     session.add(tracking)
     session.commit()
