@@ -1,0 +1,21 @@
+# Python 快取
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 日誌
+logs/
+*.log
+
+# 虛擬環境
+.venv/
+env/
+ENV/
+
+# 測試快取
+.pytest_cache/
+.coverage
+
+# IDE 設定
+.vscode/
+.idea/

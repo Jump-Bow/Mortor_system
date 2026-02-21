@@ -73,22 +73,59 @@
                         </select>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="form-group">
                         <label>開始日期</label>
                         <input type="date" id="filter-start-date" class="form-control">
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="form-group">
                         <label>結束日期</label>
                         <input type="date" id="filter-end-date" class="form-control">
                     </div>
                 </div>
-                <div class="col-md-3 d-flex align-items-end">
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>馬達類別</label>
+                        <select id="filter-group" class="form-control">
+                            <option value="">全部</option>
+                            <option value="A">A 級</option>
+                            <option value="B">B 級</option>
+                            <option value="C">C 級</option>
+                            <option value="D">D 級</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary btn-block">
-                        <i class="fas fa-search mr-1"></i>查詢
+                        <i class="fas fa-search"></i>
                     </button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>保養週期</label>
+                        <select id="filter-mterm" class="form-control">
+                            <option value="">全部</option>
+                            <option value="1M">每月 (1M)</option>
+                            <option value="3M">每季 (3M)</option>
+                            <option value="6M">半年 (6M)</option>
+                            <option value="1Y">每年 (1Y)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>狀態</label>
+                        <select id="filter-status" class="form-control">
+                            <option value="">全部狀態</option>
+                            <option value="未派工">未派工</option>
+                            <option value="執行中">執行中</option>
+                            <option value="已完成">已完成</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </form>
@@ -178,6 +215,8 @@
                             <th>工單號碼</th>
                             <th>組織</th>
                             <th>設備名稱</th>
+                            <th>馬達類別</th>
+                            <th>保養週期</th>
                             <th>狀態</th>
                             <th>完成率</th>
                             <th>負責人</th>
@@ -185,7 +224,7 @@
                     </thead>
                     <tbody id="progress-tbody">
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-4">請輸入搜尋條件後查詢</td>
+                            <td colspan="10" class="text-center text-muted py-4">請輸入搜尋條件後查詢</td>
                         </tr>
                     </tbody>
                 </table>
@@ -297,13 +336,16 @@
             org_id: $('#filter-org').val(),
             start_date: $('#filter-start-date').val(),
             end_date: $('#filter-end-date').val(),
+            group: $('#filter-group').val(),
+            mterm: $('#filter-mterm').val(),
+            status: $('#filter-status').val(),
             page: page,
             page_size: 20
         };
         Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
 
         const tbody = $('#progress-tbody');
-        tbody.html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> 查詢中...</td></tr>');
+        tbody.html('<tr><td colspan="10" class="text-center"><i class="fas fa-spinner fa-spin"></i> 查詢中...</td></tr>');
 
         $.ajax({
             url: '/api/v1/inspection/progress',
@@ -330,7 +372,7 @@
                     tbody.empty();
 
                     if (records.length === 0) {
-                        tbody.html('<tr><td colspan="8" class="text-center text-muted py-4">查無資料</td></tr>');
+                        tbody.html('<tr><td colspan="10" class="text-center text-muted py-4">查無資料</td></tr>');
                         return;
                     }
 
@@ -345,6 +387,8 @@
                         <td>${r.act_key || '-'}</td>
                         <td>${r.org_name || '-'}</td>
                         <td>${r.equipment_name || '-'}</td>
+                        <td>${r.group || '-'}</td>
+                        <td>${r.mterm || '-'}</td>
                         <td>${statusBadge}</td>
                         <td>
                             <div class="progress progress-xs"><div class="progress-bar bg-success" style="width:${r.completion_rate}%"></div></div>
@@ -359,7 +403,7 @@
             },
             error: function (xhr) {
                 if (xhr.status !== 401) {
-                    tbody.html('<tr><td colspan="8" class="text-center text-danger">查詢失敗</td></tr>');
+                    tbody.html('<tr><td colspan="10" class="text-center text-danger">查詢失敗</td></tr>');
                 }
             }
         });

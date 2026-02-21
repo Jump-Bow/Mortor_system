@@ -3,15 +3,12 @@ AIMS API Blueprint
 AIMS工單執行進度查詢 API
 """
 from flask import Blueprint, request, jsonify, current_app
-from app import db
 from app.models.Mortor_inspection import TJob, InspectionResult
-from app.models.Mortor_equipment import TEquipment, EquitCheckItem
+from app.models.Mortor_equipment import TEquipment
 from app.models.Mortor_abnormal import AbnormalCases
-from app.models.Mortor_organization import TOrganization, HrOrganization
 from app.auth.jwt_handler import token_required
 from app.utils.decorators import log_request
 from datetime import datetime
-from sqlalchemy import func, and_, or_
 import io
 import csv
 

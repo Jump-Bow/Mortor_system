@@ -14,7 +14,7 @@
             <div class="card-body">
                 <form id="filterForm">
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label>組織</label>
                                 <select class="form-control select2" id="org-filter" name="org_id">
@@ -22,7 +22,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label>異常類型</label>
                                 <select class="form-control" id="abnormal-type" name="abnormal_type">
@@ -32,7 +32,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label>案件狀態</label>
                                 <select class="form-control" id="case-status" name="case_status">
@@ -42,7 +42,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label>設備</label>
                                 <select class="form-control select2" id="equipment-filter" name="equipment_id">
@@ -50,34 +50,59 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>馬達類別</label>
+                                <select class="form-control" id="group-filter" name="group">
+                                    <option value="">全部</option>
+                                    <option value="A">A 級</option>
+                                    <option value="B">B 級</option>
+                                    <option value="C">C 級</option>
+                                    <option value="D">D 級</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <div class="form-group mb-0 w-100">
+                                <button type="button" class="btn btn-primary btn-block" onclick="searchTracking()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>保養週期</label>
+                                <select class="form-control" id="mterm-filter" name="mterm">
+                                    <option value="">全部</option>
+                                    <option value="1M">每月 (1M)</option>
+                                    <option value="3M">每季 (3M)</option>
+                                    <option value="6M">半年 (6M)</option>
+                                    <option value="1Y">每年 (1Y)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label>開始日期</label>
                                 <input type="date" class="form-control" id="start-date" name="start_date">
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label>結束日期</label>
                                 <input type="date" class="form-control" id="end-date" name="end_date">
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <div>
-                                    <button type="button" class="btn btn-primary" onclick="searchTracking()">
-                                        <i class="fas fa-search"></i> 查詢
-                                    </button>
-                                    <button type="button" class="btn btn-secondary" onclick="resetFilters()">
-                                        <i class="fas fa-redo"></i> 重置
-                                    </button>
-                                    <button type="button" class="btn btn-success" onclick="exportTracking()">
-                                        <i class="fas fa-file-export"></i> 匯出
-                                    </button>
-                                </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <div class="form-group mb-0">
+                                <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+                                    <i class="fas fa-redo"></i> 重置
+                                </button>
+                                <button type="button" class="btn btn-success" onclick="exportTracking()">
+                                    <i class="fas fa-file-export"></i> 匯出
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -175,7 +200,7 @@
                 if (response.status === 'success') {
                     const select = $('#org-filter');
                     (response.data.organizations || []).forEach(function (org) {
-                        select.append(`<option value="${org.org_id}">${org.org_name}</option>`);
+                        select.append(`<option value="${org.id}">${org.name}</option>`);
                     });
                 }
             }
@@ -184,7 +209,7 @@
 
     function loadEquipment() {
         $.ajax({
-            url: '/api/v1/equipment/list',
+            url: '/api/v1/facilities/equipment/all',
             method: 'GET',
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
             success: function (response) {
@@ -295,10 +320,9 @@
                 }
             },
             error: function (xhr) {
-                if (xhr.status === 401) {
-                    window.location.href = '/login';
-                } else {
-                    toastr.error('查詢失敗');
+                // 401 由全域 setupAjaxErrorHandler 統一處理（自動刷新 token）
+                if (xhr.status !== 401) {
+                    toastr.error('查詢失敗: ' + (xhr.responseJSON?.message || '未知錯誤'));
                 }
             }
         });
@@ -309,6 +333,8 @@
         $('#case-status').val('未結案');
         $('#org-filter').val('').trigger('change');
         $('#equipment-filter').val('').trigger('change');
+        $('#group-filter').val('');
+        $('#mterm-filter').val('');
 
         const today = new Date();
         const thirtyDaysAgo = new Date(today);

@@ -5,8 +5,9 @@ Inspection API Blueprint
 from flask import Blueprint, request, jsonify, current_app
 from app import db
 from app.models.Mortor_inspection import TJob, InspectionResult
-from app.models.Mortor_equipment import EquitCheckItem
+from app.models.Mortor_equipment import TEquipment, EquitCheckItem
 from app.models.Mortor_abnormal import AbnormalCases
+from app.models.Mortor_organization import TOrganization
 from app.models.Mortor_user import HrAccount
 from app.auth.jwt_handler import token_required
 from app.utils.decorators import log_request
@@ -88,13 +89,18 @@ def query_inspection_records(**kwargs):
     """
     查詢巡檢紀錄
     """
-    current_user = kwargs.get('current_user')
+    current_user = kwargs.get('current_user')  # noqa: F841
     
     # Get filters
     org_id = request.args.get('org_id')
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
     has_abnormal_str = request.args.get('has_abnormal')
+    group = request.args.get('group')  # 馬達類別 (A/B/C/D)
+    mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
+    equipment_id = request.args.get('equipment_id')  # 設備篩選
+    act_key = request.args.get('act_key')  # 工單號碼
+    status_filter = request.args.get('status')  # 工單狀態
     
     # Validate pagination
     page, page_size, error = Validator.validate_pagination(
@@ -135,6 +141,22 @@ def query_inspection_records(**kwargs):
             }), 400
         end_date_db = end_date_str.replace('-', '')
         query = query.filter(TJob.mdate <= end_date_db)
+    
+    # Group filter (馬達類別)
+    if group:
+        query = query.filter(TJob.group == group)
+    
+    # Mterm filter (保養週期)
+    if mterm:
+        query = query.filter(TJob.mterm == mterm)
+    
+    # Equipment filter
+    if equipment_id:
+        query = query.filter(TJob.equipmentid == equipment_id)
+    
+    # Act key filter (工單號碼模糊搜尋)
+    if act_key:
+        query = query.filter(TJob.act_key.ilike(f'%{act_key}%'))
     
     # Abnormal filter (is_out_of_spec >= 2)
     if has_abnormal_str:
@@ -236,8 +258,14 @@ def query_abnormal_tracking(**kwargs):
     """
     # Get filters
     is_processed_str = request.args.get('is_processed')
+    case_status = request.args.get('case_status')  # 前端傳遞: 未結案/已結案
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
+    org_id = request.args.get('org_id')  # 組織篩選
+    equipment_id = request.args.get('equipment_id')  # 設備篩選
+    group = request.args.get('group')  # 馬達類別 (A/B/C/D)
+    mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
+    abnormal_type = request.args.get('abnormal_type')  # 異常類型
     
     # Validate pagination
     page, page_size, error = Validator.validate_pagination(
@@ -256,12 +284,41 @@ def query_abnormal_tracking(**kwargs):
     query = AbnormalCases.query.join(InspectionResult, 
         (AbnormalCases.actid == InspectionResult.actid) & 
         (AbnormalCases.item_id == InspectionResult.item_id)
-    )
+    ).join(TJob, AbnormalCases.actid == TJob.actid
+    ).join(TEquipment, TJob.equipmentid == TEquipment.id, isouter=True)
     
-    # Status filter
-    if is_processed_str:
+    # Status filter (支援 is_processed 和 case_status 兩種傳參方式)
+    if case_status:
+        if case_status == '未結案':
+            query = query.filter(AbnormalCases.is_processed == False)
+        elif case_status == '已結案':
+            query = query.filter(AbnormalCases.is_processed == True)
+    elif is_processed_str:
         is_processed = is_processed_str.lower() == 'true'
         query = query.filter(AbnormalCases.is_processed == is_processed)
+    
+    # Organization filter
+    if org_id:
+        query = query.filter(TEquipment.unitid == org_id)
+    
+    # Equipment filter
+    if equipment_id:
+        query = query.filter(AbnormalCases.equipmentid == equipment_id)
+    
+    # Group filter (馬達類別)
+    if group:
+        query = query.filter(TJob.group == group)
+    
+    # Mterm filter (保養週期)
+    if mterm:
+        query = query.filter(TJob.mterm == mterm)
+    
+    # Abnormal type filter
+    if abnormal_type:
+        if abnormal_type == '異常':
+            query = query.filter(InspectionResult.is_out_of_spec == 2)
+        elif abnormal_type == '注意':
+            query = query.filter(InspectionResult.is_out_of_spec == 3)
     
     # Date range filter
     if start_date_str:
@@ -339,6 +396,9 @@ def query_inspection_progress(**kwargs):
         org_id = request.args.get('org_id')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
+        group = request.args.get('group')  # 馬達類別 (A/B/C/D)
+        mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
+        status_filter = request.args.get('status')  # 工單狀態
         page = request.args.get('page', 1, type=int)
         page_size = request.args.get('page_size', 20, type=int)
 
@@ -352,10 +412,14 @@ def query_inspection_progress(**kwargs):
             query = query.filter(TJob.mdate >= start_date.replace('-', ''))
         if end_date:
             query = query.filter(TJob.mdate <= end_date.replace('-', ''))
+        if group:
+            query = query.filter(TJob.group == group)
+        if mterm:
+            query = query.filter(TJob.mterm == mterm)
 
         all_jobs = query.all()
 
-        # 統計各狀態
+        # 統計各狀態 & 套用 status_filter
         stats = {
             'not_assigned': 0,
             'not_completed': 0,
@@ -363,6 +427,7 @@ def query_inspection_progress(**kwargs):
             'completed': 0,
             'other': 0
         }
+        filtered_jobs = []
         for job in all_jobs:
             job_data = job.to_dict()
             status = job_data.get('status', '')
@@ -376,10 +441,15 @@ def query_inspection_progress(**kwargs):
                 stats['completed'] += 1
             else:
                 stats['other'] += 1
+            
+            # 狀態篩選（status 為計算欄位，需於此處過濾）
+            if status_filter and status != status_filter:
+                continue
+            filtered_jobs.append(job)
 
         # 分頁查詢
-        total = len(all_jobs)
-        paginated_jobs = all_jobs[(page - 1) * page_size: page * page_size]
+        total = len(filtered_jobs)
+        paginated_jobs = filtered_jobs[(page - 1) * page_size: page * page_size]
 
         records = []
         for job in paginated_jobs:
@@ -504,7 +574,6 @@ def query_equipment_comparison(**kwargs):
     同性質設備趨勢比較
     """
     try:
-        from app.models.Mortor_equipment import EquitCheckItem
 
         org_id = request.args.get('org_id')
         group = request.args.get('group')

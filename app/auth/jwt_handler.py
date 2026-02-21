@@ -210,7 +210,7 @@ def role_required(*allowed_roles):
             current_user = kwargs.get('current_user')
             
             if not current_user:
-                SystemLog.create(level='WARN', module='Auth')
+                SysLog.create(level='WARN', module='Auth')
                 return {
                     'status': 'error',
                     'error_code': 'FORBIDDEN',
