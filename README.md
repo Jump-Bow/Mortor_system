@@ -210,11 +210,10 @@ fem-admin/
 │   │   ├── Mortor_user.py     # HrAccount, Role
 │   │   ├── Mortor_organization.py # HrOrganization, TOrganization
 │   │   ├── Mortor_inspection.py   # TJob, InspectionResult
-│   │   ├── Mortor_abnormal.py     # AbnormalCases
 │   │   └── ...
 │   ├── api/                   # API Blueprints
 │   │   ├── Mortor_auth.py
-│   │   ├── Mortor_tasks.py
+│   │   ├── Mortor_tasks.py    # RESTful Endpoints
 │   │   └── ...
 │   ├── auth/                  # 認證模組
 │   │   └── jwt_handler.py
@@ -224,7 +223,6 @@ fem-admin/
 ├── docker-compose.yml         # 生產環境配置 (Production: Gunicorn, Redis, Nginx)
 ├── docker-compose.dev.yml     # 開發環境配置 (Development: Flask run, Local PostgreSQL)
 ├── init_db.py                 # 資料庫初始化腳本
-├── create_tables.sql          # PostgreSQL DDL 腳本
 ├── config.py                  # 配置管理
 ├── run.py                     # 應用程式入口
 └── requirements.txt           # Python 依賴
