@@ -15,7 +15,6 @@ class TEquipment(db.Model):
     unitid = db.Column(db.String(48), db.ForeignKey('t_organization.unitid'))
     
     # Relationships
-    check_items = db.relationship('EquitCheckItem', backref='equipment', lazy='dynamic', cascade='all, delete-orphan')
     jobs = db.relationship('TJob', back_populates='equipment', lazy='dynamic')
     
     def __repr__(self):
@@ -31,33 +30,30 @@ class TEquipment(db.Model):
         }
         
         if include_items:
-            data['check_items'] = [
-                item.to_dict() 
-                for item in self.check_items.all()
-            ]
+            # 暫時保留空列表，或者根據新的業務邏輯填入通用項目
+            data['check_items'] = [] 
         
         return data
 
 
 class EquitCheckItem(db.Model):
-    """設備檢查項目模型 (equit_check_item)"""
+    """設備檢查項目模型 (equit_check_item) - 通用檢查項目"""
     __tablename__ = 'equit_check_item'
     
     item_id = db.Column(db.String(48), primary_key=True, comment='項目ID')
-    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), comment='設備編號')
+    # equipmentid 已移除
     sort_order = db.Column(db.String(24), comment='顯示順序')
     item_name = db.Column(db.String(48), comment='項目名稱')
     item_desc = db.Column(db.String(2000), comment='項目備註')
     status_type = db.Column(db.String(48), comment='項目狀態')
     max_v = db.Column(db.String(48), comment='標準上限')
     min_v = db.Column(db.String(48), comment='標準下限')
-    group = db.Column(db.String(24), comment='等級(ABCD)')
+    grade = db.Column(db.String(24), comment='等級(ABCD)') # Renamed from group
     mterm = db.Column(db.String(24), comment='頻率(1M, 3M)')
     unit = db.Column(db.String(24), comment='單位(mm, C)')
     
     # Relationships
     inspection_results = db.relationship('InspectionResult', backref='check_item', lazy='dynamic')
-    # Note: backref='check_item' creates InspectionResult.check_item automatically
     
     def __repr__(self):
         return f'<EquitCheckItem {self.item_id} - {self.item_name}>'
@@ -65,14 +61,13 @@ class EquitCheckItem(db.Model):
     def to_dict(self):
         return {
             'item_id': self.item_id,
-            'equipmentid': self.equipmentid,
             'sort_order': self.sort_order,
             'item_name': self.item_name,
             'item_desc': self.item_desc,
             'status_type': self.status_type,
             'max_v': self.max_v,
             'min_v': self.min_v,
-            'group': self.group,
+            'grade': self.grade, # Renamed
             'mterm': self.mterm,
             'unit': self.unit
         }
