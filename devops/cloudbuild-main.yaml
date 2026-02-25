@@ -54,7 +54,8 @@ steps:
           --network "${_VPC_NETWORK}" \
           --subnet "${_VPC_SUBNET}" \
           --vpc-egress "all-traffic" \
-          --allow-unauthenticated
+          --allow-unauthenticated \
+          --set-env-vars "^,^FLASK_ENV=production,SECRET_KEY=change-me-in-prod,JWT_SECRET_KEY=change-me-in-prod,PROD_DB_SERVER=10.x.x.x,PROD_DB_NAME=fem_prod,PROD_DB_USER=fem_admin,PROD_DB_PASSWORD=change-me,GCP_PROJECT_ID=${_DEPLOY_PROJECT_ID}"
 
 # ==============================================================================
 # 設定與環境變數
