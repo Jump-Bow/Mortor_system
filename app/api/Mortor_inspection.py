@@ -96,7 +96,7 @@ def query_inspection_records(**kwargs):
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
     has_abnormal_str = request.args.get('has_abnormal')
-    group = request.args.get('group')  # 馬達類別 (A/B/C/D)
+    grade = request.args.get('grade')  # 馬達類別 (A/B/C/D) - Renamed from group
     mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
     equipment_id = request.args.get('equipment_id')  # 設備篩選
     act_key = request.args.get('act_key')  # 工單號碼
@@ -142,9 +142,9 @@ def query_inspection_records(**kwargs):
         end_date_db = end_date_str.replace('-', '')
         query = query.filter(TJob.mdate <= end_date_db)
     
-    # Group filter (馬達類別)
-    if group:
-        query = query.filter(TJob.group == group)
+    # Grade filter (馬達類別)
+    if grade:
+        query = query.filter(TJob.grade == grade)
     
     # Mterm filter (保養週期)
     if mterm:
@@ -215,7 +215,17 @@ def get_inspection_record_details(task_id, **kwargs):
     
     if equipment:
         items_data = []
-        for item in equipment.check_items.order_by(EquitCheckItem.item_id):
+        # 原本 equipment.check_items 關聯已移除，需改為查詢通用檢查項目
+        # 並根據 task.grade 和 task.mterm 進行過濾
+        # from app.models.Mortor_equipment import EquitCheckItem
+        
+        # 1. 找出該任務應該做的項目 (依規格)
+        spec_items = EquitCheckItem.query.filter_by(
+            grade=task.grade,
+            mterm=task.mterm
+        ).order_by(EquitCheckItem.sort_order).all()
+        
+        for item in spec_items:
             result = InspectionResult.query.filter_by(
                 actid=task_id,
                 item_id=item.item_id
@@ -263,7 +273,7 @@ def query_abnormal_tracking(**kwargs):
     end_date_str = request.args.get('end_date')
     org_id = request.args.get('org_id')  # 組織篩選
     equipment_id = request.args.get('equipment_id')  # 設備篩選
-    group = request.args.get('group')  # 馬達類別 (A/B/C/D)
+    grade = request.args.get('grade')  # 馬達類別 (A/B/C/D) - Renamed from group
     mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
     abnormal_type = request.args.get('abnormal_type')  # 異常類型
     
@@ -305,9 +315,9 @@ def query_abnormal_tracking(**kwargs):
     if equipment_id:
         query = query.filter(AbnormalCases.equipmentid == equipment_id)
     
-    # Group filter (馬達類別)
-    if group:
-        query = query.filter(TJob.group == group)
+    # Grade filter (馬達類別)
+    if grade:
+        query = query.filter(TJob.grade == grade)
     
     # Mterm filter (保養週期)
     if mterm:
@@ -396,7 +406,7 @@ def query_inspection_progress(**kwargs):
         org_id = request.args.get('org_id')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
-        group = request.args.get('group')  # 馬達類別 (A/B/C/D)
+        grade = request.args.get('grade')  # 馬達類別 (A/B/C/D) - Renamed from group
         mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
         status_filter = request.args.get('status')  # 工單狀態
         page = request.args.get('page', 1, type=int)
@@ -412,8 +422,8 @@ def query_inspection_progress(**kwargs):
             query = query.filter(TJob.mdate >= start_date.replace('-', ''))
         if end_date:
             query = query.filter(TJob.mdate <= end_date.replace('-', ''))
-        if group:
-            query = query.filter(TJob.group == group)
+        if grade:
+            query = query.filter(TJob.grade == grade)
         if mterm:
             query = query.filter(TJob.mterm == mterm)
 
@@ -490,8 +500,8 @@ def query_equipment_trend(equipmentid, **kwargs):
     try:
         from app.models.Mortor_equipment import EquitCheckItem
 
-        # 取得設備的所有檢查項目
-        check_items = EquitCheckItem.query.filter_by(equipmentid=equipmentid).all()
+        # 取得所有通用檢查項目 (不再綁定特定設備)
+        check_items = EquitCheckItem.query.all()
 
         # 取得歷史量測結果
         results = InspectionResult.query.filter_by(
@@ -576,7 +586,7 @@ def query_equipment_comparison(**kwargs):
     try:
 
         org_id = request.args.get('org_id')
-        group = request.args.get('group')
+        grade = request.args.get('grade') # Renamed from group
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
@@ -585,10 +595,10 @@ def query_equipment_comparison(**kwargs):
         if org_id:
             equip_query = equip_query.filter(TEquipment.unitid == org_id)
 
-        # 透過 jobs 篩選 group
-        if group:
+        # 透過 jobs 篩選 grade
+        if grade:
             equip_ids_with_group = db.session.query(TJob.equipmentid).filter(
-                TJob.group == group
+                TJob.grade == grade
             ).distinct().all()
             equip_ids = [e[0] for e in equip_ids_with_group]
             equip_query = equip_query.filter(TEquipment.id.in_(equip_ids))
@@ -638,17 +648,17 @@ def query_equipment_comparison(**kwargs):
                 if org:
                     org_name = org.name
 
-            # 設備的 group
-            equip_group = None
+            # 設備的 grade
+            equip_grade = None
             job = TJob.query.filter_by(equipmentid=equip.id).first()
             if job:
-                equip_group = job.group
+                equip_grade = job.grade
 
             equipment_list.append({
                 'id': equip.id,
                 'name': equip.name,
                 'org_name': org_name,
-                'group': equip_group,
+                'grade': equip_grade, # Renamed
                 'last_inspection_date': last_date,
                 'avg_value': avg_value,
                 'abnormal_count': abnormal_count

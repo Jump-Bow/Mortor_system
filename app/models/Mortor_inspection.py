@@ -16,7 +16,7 @@ class TJob(db.Model):
     act_key = db.Column(db.String(30), comment='工單編號')
     act_mem_id = db.Column(db.String(30), db.ForeignKey('hr_account.id'), comment='負責人ID')
     act_mem = db.Column(db.String(30), comment='負責人名稱')
-    group = db.Column(db.String(8), comment='等級(ABCD)')
+    grade = db.Column(db.String(8), comment='等級(ABCD)') # Renamed from group
     mterm = db.Column(db.String(8), comment='頻率(1M, 3M)')
     
     # Relationships
@@ -31,8 +31,10 @@ class TJob(db.Model):
     def to_dict(self, include_results: bool = False):
         # Calculate status
         total_items = 0
-        if self.equipment:
-            total_items = self.equipment.check_items.count()
+        # 需修改邏輯：現在是通用檢查項目，無法直接從 equipment 關聯
+        # 應該查詢符合該工單 grade/mterm 的檢查項目數量
+        from app.models.Mortor_equipment import EquitCheckItem
+        total_items = EquitCheckItem.query.filter_by(grade=self.grade, mterm=self.mterm).count()
             
         completed_items = self.results.count()
         
@@ -58,7 +60,7 @@ class TJob(db.Model):
             'act_mem': self.act_mem,
             'act_mem_name': self.act_mem,
             'org_name': self.assigned_user.organization.name if self.assigned_user and self.assigned_user.organization else None,
-            'group': self.group,
+            'grade': self.grade, # Renamed
             'mterm': self.mterm,
             'status': status,
             'completion_rate': round(completion_rate, 1),
