@@ -19,3 +19,7 @@ ENV/
 # IDE 設定
 .vscode/
 .idea/
+
+# 快取檔案 (SonarQube, Jupyter 等)
+.sonar/
+.ipynb_checkpoints/

@@ -1,7 +1,0 @@
-organization=chimei
-projectKey=chimei_onetimescan
-serverUrl=https://sonarcloud.io
-serverVersion=8.0.0.81787
-dashboardUrl=https://sonarcloud.io/dashboard?id=chimei_onetimescan
-ceTaskId=AZyNpj0c--a8fT-mjxDO
-ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AZyNpj0c--a8fT-mjxDO
