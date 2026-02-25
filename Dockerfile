@@ -8,7 +8,8 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    FLASK_APP=run.py
+    FLASK_APP=run.py \
+    PORT=5000
 
 # Install system dependencies (PostgreSQL client libraries)
 RUN apt-get update && apt-get install -y \
@@ -35,9 +36,11 @@ RUN mkdir -p logs uploads/photos
 # Expose port
 EXPOSE 5000
 
-# Health check
+# Health check (Use dynamic port if possible, or stay at localhost:5000 for local check)
+# In Cloud Run, health check is handled by GCP via the port. 
+# This HEALTHCHECK is primarily for local docker-compose.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:5000/login || exit 1
 
-# Run application with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--threads", "2", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-", "run:app"]
+# Run application with gunicorn using the dynamic PORT variable
+CMD gunicorn --bind 0.0.0.0:$PORT --workers 4 --threads 2 --timeout 60 --access-logfile - --error-logfile - "run:app"

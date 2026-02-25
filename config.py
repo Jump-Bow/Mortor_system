@@ -50,9 +50,11 @@ class Config:
     AIMS_API_KEY = os.getenv('AIMS_API_KEY', '')
     
     # File Upload
+    UPLOAD_PROVIDER = os.getenv('UPLOAD_PROVIDER', 'local')  # 'local' or 'gcs'
     UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads'))
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_UPLOAD_SIZE', 16 * 1024 * 1024))  # 16MB default
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    GCS_BUCKET_NAME = os.getenv('GCS_BUCKET_NAME', '')
     
     # Pagination
     ITEMS_PER_PAGE = 20
@@ -175,7 +177,8 @@ class ProductionConfig(Config):
     CACHE_REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', '')
     
     # Logging
-    LOG_LEVEL = 'WARNING'
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    UPLOAD_PROVIDER = 'gcs'  # 在 Cloud Run 預設切換為 GCS
 
 
 config = {
