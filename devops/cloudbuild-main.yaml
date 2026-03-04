@@ -54,8 +54,8 @@ steps:
           --network "${_VPC_NETWORK}" \
           --subnet "${_VPC_SUBNET}" \
           --vpc-egress "all-traffic" \
-          --set-env-vars "FLASK_ENV=production" \
-          --set-secrets "PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest" \
+          --set-env-vars "FLASK_ENV=production,USE_AZURE_AD=true" \
+          --set-secrets "PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest,AZURE_CLIENT_ID=FM_AZURE_CLIENT_ID:latest,AZURE_CLIENT_SECRET=FM_AZURE_CLIENT_SECRET:latest,AZURE_TENANT_ID=FM_AZURE_TENANT_ID:latest,AZURE_REDIRECT_URI=FM_AZURE_REDIRECT_URI:latest" \
           --allow-unauthenticated
 
 

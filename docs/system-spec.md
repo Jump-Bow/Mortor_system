@@ -33,7 +33,7 @@
 | **伺服器資料庫** | PostgreSQL 16 | 分為測試區與正式區環境 |
 | **部署環境** | GCP / Docker | 雲端與容器化部署 |
 | **安全協定** | SSL/TLS | 所有網路傳輸加密 |
-| **身份驗證** | Azure Entra ID (Planned) / JWT | 支援 AD 帳號驗證 (規劃中) 與 Token 驗證 |
+| **身份驗證** | Azure Entra ID / JWT | 支援 Local 帳密登入與 Azure AD (OAuth 2.0 Authorization Code Flow) 認證 |
 | **資料庫驗證** | Password / IAM | 遵循最小權限原則 |
 | **資料庫驅動** | psycopg2-binary | PostgreSQL Python Adapter |
 
@@ -43,7 +43,7 @@
 
 | **模組** | **功能項目** | **詳細描述** | **參考資料** |
 | :--- | :--- | :--- | :--- |
-| **使用者管理** | 使用者登入/登出 | - 提供帳號密碼登入介面(預設帳密為 admin / 1234qwer5T)。<br>- 系統名稱為「FEM 設備保養管理系統」。<br>- 支援 Azure Entra ID 帳號進行驗證 (開發中)。 | system-requirement.md 3.1 |
+| **使用者管理** | 使用者登入/登出 | - 提供帳號密碼登入介面(預設帳密為 admin / 1234qwer5T)。<br>- 系統名稱為「FEM 設備保養管理系統」。<br>- 支援 Azure Entra ID (Azure AD) 帳號進行 OAuth 2.0 認證登入。<br>- AD 帳號與系統 hr_account.id 對應，AD 僅負責身份驗證。 | system-requirement.md 3.1 |
 | **使用者管理** | 權限管理 | - 根據不同使用者角色(如管理者、一般使用者)給予相對應的操作權限。 | system-requirement.md 3.1 |
 | **使用者管理** | 使用者 CRUD | - 提供使用者列表查詢、新增、編輯、停用功能。<br>- 支援密碼重設功能。<br>- 支援搜尋與篩選功能。 | system-requirement.md 3.1 |
 | **主頁儀表板 (Dashboard)** | 異常追蹤統計 | - 顯示即時的異常追蹤數據,包含:今日異常項目總數、今日注意項目總數、累積異常未結案、累積注意未結案。 | system-requirement.md 3.2 |
@@ -191,7 +191,9 @@ API 作為後台與行動 APP 之間的溝通橋樑。
 
 | **功能類別** | **API 端點** | **HTTP Method** | **描述** | **使用對象** | **參考** |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **認證與授權** | `/api/auth/login` | POST | 使用者登入並獲取 JWT token | APP, Web | system-requirement.md 3.1, 4.1 |
+| **認證與授權** | `/api/auth/login` | POST | 使用者登入並獲取 JWT token (Local/Azure AD) | APP, Web | system-requirement.md 3.1, 4.1 |
+| **認證與授權** | `/api/auth/azure/login` | GET | 產生 Azure AD 授權 URL，導向 Microsoft 登入頁 | Web | - |
+| **認證與授權** | `/api/auth/azure/callback` | GET | Azure AD OAuth 回調，用授權碼換取 Token 並發放 JWT | Web | - |
 | **認證與授權** | `/api/auth/logout` | POST | 使用者登出 | APP, Web | system-requirement.md 3.1 |
 | **認證與授權** | `/api/auth/refresh` | POST | 重新整理 token | APP, Web | - |
 | **任務管理** | `/api/tasks/download` | GET | 下載指派給該使用者的巡檢任務與表單內容至 APP 本地 | APP | system-requirement.md 4.1, 4.2 |
@@ -235,7 +237,45 @@ API 作為後台與行動 APP 之間的溝通橋樑。
 
 ##### **2.1 認證與授權**
 
-**使用者登入**
+本系統支援兩種認證方式：**Local 帳密登入** 與 **Azure AD (Microsoft Entra ID) OAuth 2.0 授權碼登入**。
+
+###### Azure AD 認證流程圖
+
+```
+[前端 App / 瀏覽器]
+    │
+    │ 1. GET /api/v1/auth/azure/login
+    ▼
+[Flask API]
+    │
+    │ 2. 回傳 Azure AD 授權 URL (auth_url)
+    ▼
+[前端 App / 瀏覽器]
+    │
+    │ 3. 導向 Microsoft 登入頁面
+    ▼
+[Azure AD (Microsoft)]
+    │
+    │ 4. 使用者輸入 AD 帳密，認證成功
+    │
+    │ 5. 回調 GET /api/v1/auth/azure/callback?code=AUTHORIZATION_CODE
+    ▼
+[Flask API]
+    │
+    │ 6. 使用 MSAL 將 code 換取 id_token
+    │ 7. 從 id_token 取得 preferred_username
+    │ 8. 以 username 查詢 hr_account.id
+    │ 9. 若存在 → 發放本系統 JWT Token
+    │    若不存在 → 401 此帳號未授權使用本系統
+    ▼
+[前端接收 JWT Token，後續 API 呼叫帶入 Authorization Header]
+```
+
+> **核心認知**：Azure AD 僅負責驗證身份。AD 帳號 = `hr_account.id`，認證成功後直接查詢資料庫中對應的使用者，不需要額外的資料庫欄位。
+
+---
+
+**2.1.1 Local 使用者登入**
 
 * **Endpoint**: `/api/auth/login`
 * **Method**: `POST`
@@ -248,14 +288,6 @@ API 作為後台與行動 APP 之間的溝通橋樑。
     "login_type": "local"
   }
   ```
-  
-  或使用 Azure AD:
-  ```json
-  {
-    "ad_token": "azure_ad_token_string",
-    "login_type": "azure_ad"
-  }
-  ```
 
 * **Response Body (Success - 200 OK)**:
   ```json
@@ -266,11 +298,10 @@ API 作為後台與行動 APP 之間的溝通橋樑。
       "refresh_token": "refresh_token_string",
       "expires_in": 3600,
       "user": {
-        "user_id": "USER001",
-        "username": "admin",
-        "full_name": "系統管理員",
-        "employee_id": "A0001",
-        "role": "管理者"
+        "id": "admin",
+        "name": "系統管理員",
+        "organizationid": "ORG-ADMIN",
+        "email": "admin@chimei.com"
       }
     }
   }
@@ -283,6 +314,95 @@ API 作為後台與行動 APP 之間的溝通橋樑。
     "message": "帳號或密碼錯誤"
   }
   ```
+
+---
+
+**2.1.2 Azure AD 授權 URL 取得**
+
+* **Endpoint**: `/api/auth/azure/login`
+* **Method**: `GET`
+* **描述**: 產生 Azure AD OAuth 2.0 授權 URL，前端需將使用者導向此 URL 以進行 Microsoft 登入。
+
+* **Response Body (Success - 200 OK)**:
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "auth_url": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize?client_id=...&redirect_uri=...&scope=User.Read&response_type=code"
+    }
+  }
+  ```
+
+* **Response Body (Error - 503 Service Unavailable)**:
+  ```json
+  {
+    "status": "error",
+    "message": "Azure AD 認證未啟用"
+  }
+  ```
+
+---
+
+**2.1.3 Azure AD OAuth 回調**
+
+* **Endpoint**: `/api/auth/azure/callback`
+* **Method**: `GET`
+* **描述**: Microsoft 登入成功後自動導向此端點，系統接收 authorization code 並換取 token。
+* **Query Parameters**:
+  - `code`: Azure AD 回傳的授權碼 (由 Microsoft 自動帶入)
+
+* **Response Body (Success - 200 OK)**:
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "refresh_token": "refresh_token_string",
+      "expires_in": 3600,
+      "user": {
+        "id": "I0001",
+        "name": "張文雄",
+        "organizationid": "ORG-ADMIN",
+        "email": "user001@chimei.com"
+      }
+    }
+  }
+  ```
+
+* **Response Body (Error - 401 Unauthorized)**:
+  ```json
+  {
+    "status": "error",
+    "message": "此帳號未授權使用本系統"
+  }
+  ```
+
+* **Response Body (Error - 400 Bad Request)**:
+  ```json
+  {
+    "status": "error",
+    "message": "Azure AD 認證失敗：未提供授權碼"
+  }
+  ```
+
+---
+
+**2.1.4 Azure AD 環境設定**
+
+| 環境變數 | 說明 | 範例 |
+| :--- | :--- | :--- |
+| `USE_AZURE_AD` | 是否啟用 Azure AD 認證 | `true` |
+| `AZURE_CLIENT_ID` | Azure 應用程式註冊 Client ID | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
+| `AZURE_CLIENT_SECRET` | Azure 應用程式 Client Secret | `your-secret` |
+| `AZURE_TENANT_ID` | Azure AD 租戶 ID | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
+| `AZURE_REDIRECT_URI` | OAuth 回調 URL | `https://your-domain/api/v1/auth/azure/callback` |
+
+**Azure Portal Redirect URI 設定：**
+
+| 環境 | Redirect URI |
+| :--- | :--- |
+| Production | `https://<YOUR_DOMAIN>/api/v1/auth/azure/callback` |
+| 本地開發 | `http://localhost:5000/api/v1/auth/azure/callback` |
 
 ##### **2.2 任務管理**
 

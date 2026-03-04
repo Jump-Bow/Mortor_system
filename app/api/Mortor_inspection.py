@@ -96,7 +96,7 @@ def query_inspection_records(**kwargs):
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
     has_abnormal_str = request.args.get('has_abnormal')
-    grade = request.args.get('grade')  # 馬達類別 (A/B/C/D) - Renamed from group
+    grade = request.args.get('group')  # 修正：前端傳送的參數名為 group
     mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
     equipment_id = request.args.get('equipment_id')  # 設備篩選
     act_key = request.args.get('act_key')  # 工單號碼
@@ -273,7 +273,7 @@ def query_abnormal_tracking(**kwargs):
     end_date_str = request.args.get('end_date')
     org_id = request.args.get('org_id')  # 組織篩選
     equipment_id = request.args.get('equipment_id')  # 設備篩選
-    grade = request.args.get('grade')  # 馬達類別 (A/B/C/D) - Renamed from group
+    grade = request.args.get('group')  # 修正：前端傳送的參數名為 group
     mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
     abnormal_type = request.args.get('abnormal_type')  # 異常類型
     
@@ -309,7 +309,7 @@ def query_abnormal_tracking(**kwargs):
     
     # Organization filter
     if org_id:
-        query = query.filter(TEquipment.unitid == org_id)
+        query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid == org_id)
     
     # Equipment filter
     if equipment_id:
@@ -406,7 +406,7 @@ def query_inspection_progress(**kwargs):
         org_id = request.args.get('org_id')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
-        grade = request.args.get('grade')  # 馬達類別 (A/B/C/D) - Renamed from group
+        grade = request.args.get('group')  # 修正：前端傳送的參數名為 group
         mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
         status_filter = request.args.get('status')  # 工單狀態
         page = request.args.get('page', 1, type=int)
@@ -417,7 +417,7 @@ def query_inspection_progress(**kwargs):
         )
 
         if org_id:
-            query = query.filter(TEquipment.unitid == org_id)
+            query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid == org_id)
         if start_date:
             query = query.filter(TJob.mdate >= start_date.replace('-', ''))
         if end_date:

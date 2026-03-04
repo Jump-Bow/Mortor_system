@@ -42,6 +42,7 @@ class Config:
     AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET', '')
     AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID', '')
     AZURE_AUTHORITY = f"https://login.microsoftonline.com/{os.getenv('AZURE_TENANT_ID', '')}"
+    AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', 'http://localhost:5000/api/v1/auth/azure/callback')
     AZURE_SCOPE = ["User.Read"]
     
     # AIMS Integration

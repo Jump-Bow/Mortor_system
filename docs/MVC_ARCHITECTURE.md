@@ -145,7 +145,8 @@ fem-admin/
 │   │   └── images/                #    圖片資源
 │   │
 │   ├── auth/                      # 🔐 輔助模組：認證
-│   │   └── jwt_handler.py         #    JWT Token 處理
+│   │   ├── jwt_handler.py         #    JWT Token 處理
+│   │   └── azure_ad_handler.py    #    Azure AD (MSAL) 認證處理
 │   │
 │   ├── utils/                     # 🔧 輔助模組：工具
 │   │   ├── decorators.py          #    裝飾器 (驗證、日誌、限流)
