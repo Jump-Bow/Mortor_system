@@ -265,21 +265,37 @@ def register_error_handlers(app: Flask) -> None:
 
 def setup_logging(app: Flask) -> None:
     """Setup application logging"""
-    if not app.debug and not app.testing:
-        # Create logs directory
+    log_level = getattr(logging, app.config.get('LOG_LEVEL', 'INFO'))
+    
+    if app.debug or app.testing:
+        app.logger.setLevel(logging.DEBUG)
+        return
+
+    # Create formatters
+    formatter = logging.Formatter(app.config.get('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+    if app.config.get('FLASK_ENV') == 'production' or os.getenv('K_SERVICE'):
+        # In Cloud Run (Production), log to stdout (StreamHandler)
+        # Google Cloud Logging automatically collects stdout/stderr
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        stream_handler.setLevel(log_level)
+        app.logger.addHandler(stream_handler)
+        app.logger.setLevel(log_level)
+        app.logger.info('FEM Application logging to stdout (Cloud Run mode)')
+    else:
+        # Local or Development environment, log to file
         os.makedirs('logs', exist_ok=True)
         
-        # File handler
         file_handler = RotatingFileHandler(
-            app.config['LOG_FILE'],
+            app.config.get('LOG_FILE', 'logs/fem.log'),
             maxBytes=10240000,  # 10MB
             backupCount=10
         )
-        file_handler.setFormatter(logging.Formatter(
-            app.config['LOG_FORMAT']
-        ))
-        file_handler.setLevel(getattr(logging, app.config['LOG_LEVEL']))
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(log_level)
         app.logger.addHandler(file_handler)
         
-        app.logger.setLevel(getattr(logging, app.config['LOG_LEVEL']))
-        app.logger.info('FEM Application startup')
+        app.logger.setLevel(log_level)
+        app.logger.info('FEM Application logging to file')
+

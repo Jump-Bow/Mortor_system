@@ -95,7 +95,9 @@ https://your-domain.com/api/docs
 > - `/api/*` - 指向最新版本（目前為 v1）
 
 - **認證** (`/api/v1/auth/*` 或 `/api/auth/*`)
-  - `POST /login` - 使用者登入
+  - `POST /login` - 使用者登入 (Local 帳密)
+  - `GET /azure/login` - 取得 Azure AD 授權 URL
+  - `GET /azure/callback` - Azure AD OAuth 回調
   - `POST /logout` - 使用者登出
   - `POST /refresh` - Token 刷新
   - `GET /verify` - 驗證 Token
@@ -179,7 +181,50 @@ https://your-domain.com/api/docs
 
 ### 常見 API 使用範例
 
-#### 範例 1：下載巡檢任務
+#### 範例 1：Azure AD 登入流程
+
+**步驟 1：取得 Azure AD 授權 URL**
+```http
+GET /api/v1/auth/azure/login
+```
+
+回應範例：
+```json
+{
+  "status": "success",
+  "data": {
+    "auth_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize?client_id=...&redirect_uri=...&scope=User.Read&response_type=code"
+  }
+}
+```
+
+**步驟 2：前端導向 `auth_url`，使用者在 Microsoft 頁面完成登入**
+
+**步驟 3：Microsoft 自動回調 callback 端點，系統回傳 JWT Token**
+```http
+GET /api/v1/auth/azure/callback?code=AUTHORIZATION_CODE
+```
+
+回應範例：
+```json
+{
+  "status": "success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "...",
+    "expires_in": 3600,
+    "user": {
+      "id": "I0001",
+      "name": "張文雄",
+      "email": "user001@chimei.com"
+    }
+  }
+}
+```
+
+> **注意**：Azure AD 帳號必須與系統 `hr_account.id` 對應，否則回傳 401。
+
+#### 範例 2：下載巡檢任務
 
 ```http
 GET /api/v1/tasks/download?date=2024-10-28
@@ -210,7 +255,7 @@ Authorization: Bearer your_token_here
 }
 ```
 
-#### 範例 2：上傳巡檢結果
+#### 範例 3：上傳巡檢結果
 
 ```http
 POST /api/v1/results/upload
@@ -243,21 +288,21 @@ Content-Type: application/json
 }
 ```
 
-#### 範例 3：查詢組織樹
+#### 範例 4：查詢組織樹
 
 ```http
 GET /api/v1/organizations/tree
 Authorization: Bearer your_token_here
 ```
 
-#### 範例 4：查詢設施樹
+#### 範例 5：查詢設施樹
 
 ```http
 GET /api/v1/facilities/tree?org_id=ORG001
 Authorization: Bearer your_token_here
 ```
 
-#### 範例 5：查詢巡檢統計
+#### 範例 6：查詢巡檢統計
 
 ```http
 GET /api/v1/inspection/statistics?start_date=2024-10-01&end_date=2024-10-31
