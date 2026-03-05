@@ -47,10 +47,10 @@ def create_app(config_name: str = None) -> Flask:
     cache.init_app(app)
     csrf.init_app(app)
     
-    # CORS Configuration - Allow all origins for API
+    # CORS Configuration - 使用 config 中的白名單（禁止萬用字元 + credentials）
     CORS(app, resources={
         r"/api/*": {
-            "origins": "*",
+            "origins": app.config.get('CORS_ORIGINS', []),
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
             "expose_headers": ["Content-Type", "Authorization"],
@@ -58,6 +58,10 @@ def create_app(config_name: str = None) -> Flask:
             "max_age": 3600
         }
     })
+    
+    # 全局 API 速率限制（使用 Redis 滑動窗口）
+    from app.middleware.rate_limiter import RateLimiter
+    RateLimiter.init_app(app)
     
     # Setup logging
     setup_logging(app)
@@ -116,6 +120,9 @@ def create_app(config_name: str = None) -> Flask:
         app.logger.info(f'Connecting to Database: {masked_uri}')
     else:
         app.logger.info(f'Connecting to Database: {db_uri}')
+    
+    # 5d: 啟動配置驗證
+    _validate_config(app)
     
     return app
 
@@ -182,111 +189,54 @@ def register_blueprints(app: Flask) -> None:
 
 
 def register_error_handlers(app: Flask) -> None:
-    """Register error handlers"""
-    from app.models.Mortor_system_log import SysLog
+    """將錯誤處理委派給獨立模組（utils/error_handlers.py）"""
+    from app.utils.error_handlers import register_error_handlers as _register
+    _register(app)
 
-    @app.errorhandler(400)
-    def bad_request(error):
-        return jsonify({
-            'status': 'error',
-            'error_code': 'BAD_REQUEST',
-            'message': '請求參數錯誤'
-        }), 400
-    
-    @app.errorhandler(401)
-    def unauthorized(error):
-        SysLog.create(level='WARN', module='Auth')
-        return jsonify({
-            'status': 'error',
-            'error_code': 'UNAUTHORIZED',
-            'message': '未授權，需要登入'
-        }), 401
-    
-    @app.errorhandler(403)
-    def forbidden(error):
-        SysLog.create(level='WARN', module='Auth')
-        return jsonify({
-            'status': 'error',
-            'error_code': 'FORBIDDEN',
-            'message': '禁止訪問，權限不足'
-        }), 403
 
-    @app.errorhandler(404)
-    def not_found(error):
-        return jsonify({
-            'status': 'error',
-            'error_code': 'NOT_FOUND',
-            'message': '資源不存在'
-        }), 404
-    
-    @app.errorhandler(409)
-    def conflict(error):
-        return jsonify({
-            'status': 'error',
-            'error_code': 'CONFLICT',
-            'message': '資源衝突'
-        }), 409
-    
-    @app.errorhandler(422)
-    def unprocessable_entity(error):
-        return jsonify({
-            'status': 'error',
-            'error_code': 'UNPROCESSABLE_ENTITY',
-            'message': '資料驗證失敗'
-        }), 422
-    
-    @app.errorhandler(429)
-    def too_many_requests(error):
-        return jsonify({
-            'status': 'error',
-            'error_code': 'TOO_MANY_REQUESTS',
-            'message': '請求過於頻繁'
-        }), 429
-    
-    @app.errorhandler(500)
-    def internal_server_error(error):
-        app.logger.error(f'Internal Server Error: {error}')
-        SysLog.create(level='ERROR', module='System')
-        return jsonify({
-            'status': 'error',
-            'error_code': 'INTERNAL_SERVER_ERROR',
-            'message': '伺服器內部錯誤'
-        }), 500
-    
-    @app.errorhandler(503)
-    def service_unavailable(error):
-        SysLog.create(level='ERROR', module='System')
-        return jsonify({
-            'status': 'error',
-            'error_code': 'SERVICE_UNAVAILABLE',
-            'message': '服務暫時無法使用'
-        }), 503
 
 
 def setup_logging(app: Flask) -> None:
-    """Setup application logging"""
+    """設置應用程式日誌
+    
+    - Cloud Run (Production/K_SERVICE)：使用 JSON 結構化格式，由 Google Cloud Logging 自動解析
+    - 本地開發：使用人類可讀的純文字格式，寫入 RotatingFileHandler
+    """
     log_level = getattr(logging, app.config.get('LOG_LEVEL', 'INFO'))
     
     if app.debug or app.testing:
         app.logger.setLevel(logging.DEBUG)
         return
 
-    # Create formatters
-    formatter = logging.Formatter(app.config.get('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-
     if app.config.get('FLASK_ENV') == 'production' or os.getenv('K_SERVICE'):
-        # In Cloud Run (Production), log to stdout (StreamHandler)
-        # Google Cloud Logging automatically collects stdout/stderr
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(formatter)
-        stream_handler.setLevel(log_level)
-        app.logger.addHandler(stream_handler)
-        app.logger.setLevel(log_level)
-        app.logger.info('FEM Application logging to stdout (Cloud Run mode)')
-    else:
-        # Local or Development environment, log to file
-        os.makedirs('logs', exist_ok=True)
+        # Cloud Run：JSON 結構化日誌，Google Cloud Logging 可正確解析 severity/module
+        try:
+            from pythonjsonlogger import jsonlogger
+            json_formatter = jsonlogger.JsonFormatter(
+                fmt='%(asctime)s %(name)s %(levelname)s %(message)s',
+                rename_fields={'levelname': 'severity', 'asctime': 'time'}
+            )
+            stream_handler = logging.StreamHandler()
+            stream_handler.setFormatter(json_formatter)
+            stream_handler.setLevel(log_level)
+            app.logger.addHandler(stream_handler)
+        except ImportError:
+            # 降級：python-json-logger 未安裝時，使用純文字 stdout
+            stream_handler = logging.StreamHandler()
+            stream_handler.setFormatter(logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            ))
+            stream_handler.setLevel(log_level)
+            app.logger.addHandler(stream_handler)
         
+        app.logger.setLevel(log_level)
+        app.logger.info('FEM Application logging to stdout (Cloud Run JSON mode)')
+    else:
+        # 本地開發：純文字格式，寫入 RotatingFileHandler
+        os.makedirs('logs', exist_ok=True)
+        formatter = logging.Formatter(
+            app.config.get('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        )
         file_handler = RotatingFileHandler(
             app.config.get('LOG_FILE', 'logs/fem.log'),
             maxBytes=10240000,  # 10MB
@@ -295,7 +245,19 @@ def setup_logging(app: Flask) -> None:
         file_handler.setFormatter(formatter)
         file_handler.setLevel(log_level)
         app.logger.addHandler(file_handler)
-        
         app.logger.setLevel(log_level)
         app.logger.info('FEM Application logging to file')
+
+
+def _validate_config(app: Flask) -> None:
+    """5d: 啟動配置驗證 — 缺少關鍵設定時提早發出警告"""
+    required_keys = [
+        ('SECRET_KEY', '請設定 SECRET_KEY 環境變數'),
+        ('JWT_SECRET_KEY', '請設定 JWT_SECRET_KEY 環境變數'),
+        ('SQLALCHEMY_DATABASE_URI', '請設定資料庫連線字串'),
+    ]
+    for key, hint in required_keys:
+        val = app.config.get(key)
+        if not val or val in ('dev-secret-key', 'dev-jwt-secret-key', 'change-me-in-production'):
+            app.logger.warning(f'[配置警告] {key} 未設定或使用預設值。{hint}')  
 

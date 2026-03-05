@@ -3,6 +3,7 @@ JWT Handler for Authentication
 JWT Token 管理與驗證
 """
 import jwt
+import uuid
 from datetime import datetime
 from flask import current_app, request
 from functools import wraps
@@ -27,7 +28,9 @@ class JWTHandler:
             Tuple of (access_token, refresh_token)
         """
         # Access Token
+        access_jti = str(uuid.uuid4())  # 唯一 Token ID，用於黑名單機制
         access_payload = {
+            'jti': access_jti,
             'user_id': user_id,
             'username': username,
             'role': role,
@@ -42,7 +45,9 @@ class JWTHandler:
         )
         
         # Refresh Token
+        refresh_jti = str(uuid.uuid4())  # 唯一 Token ID
         refresh_payload = {
+            'jti': refresh_jti,
             'user_id': user_id,
             'username': username,
             'exp': datetime.utcnow() + current_app.config['JWT_REFRESH_TOKEN_EXPIRES'],
@@ -177,6 +182,18 @@ def token_required(f):
                 'error_code': 'UNAUTHORIZED',
                 'message': '無效的 Token 類型'
             }, 401
+        
+        # 檢查 Token 是否已被撤銷（黑名單機制）
+        jti = payload.get('jti')
+        if jti:
+            from app.services.token_blacklist import TokenBlacklistService
+            if TokenBlacklistService.is_blacklisted(jti):
+                SysLog.create(level='WARN', module='Auth')
+                return {
+                    'status': 'error',
+                    'error_code': 'TOKEN_REVOKED',
+                    'message': 'Token 已被撤銷，請重新登入'
+                }, 401
         
         # Verify user still exists and is active
         from app.models.Mortor_user import HrAccount

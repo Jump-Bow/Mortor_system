@@ -255,34 +255,43 @@ def logout(**kwargs):
     """
     使用者登出
     
-    Note: JWT 是無狀態的，實際登出需要前端刪除 token
+    將當前 Token 的 JTI 加入 Redis 黑名單，
+    使該 Token 在過期前無法再用於認證。
     """
     try:
         current_user = kwargs.get('current_user')
+        token_payload = kwargs.get('token_payload', {})
         current_user_id = current_user.id if current_user else 'Unknown'
+        
+        # 將 Token JTI 加入黑名單
+        jti = token_payload.get('jti')
+        if jti:
+            from app.services.token_blacklist import TokenBlacklistService
+            from datetime import datetime, timedelta
+            
+            # 計算 Token 剩餘有效時間作為 Redis TTL
+            exp = token_payload.get('exp')
+            if exp:
+                remaining = exp - int(datetime.utcnow().timestamp())
+                expires_delta = timedelta(seconds=max(remaining, 0))
+            else:
+                expires_delta = None
+            
+            TokenBlacklistService.add_to_blacklist(jti, expires_delta)
         
         UserLog.log_action(
             user_id=current_user_id,
             action_type='LOGOUT',
-            description='User logged out',
+            description=f'使用者 {current_user_id} 登出系統 (JTI: {jti[:8] if jti else "N/A"}...)',
             ip_address=request.remote_addr
         )
         
-        return jsonify({
-            'status': 'success',
-            'message': 'Successfully logged out'
-        }), 200
+        from app.utils.api_response import success_response
+        return success_response(message='登出成功')
     except Exception as e:
         current_app.logger.error(f"Logout error: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': '登出過程發生錯誤'
-        }), 500   
-    # The following lines were part of the original response and are now replaced by the new return statement.
-    # return jsonify({
-    #     'status': 'success',
-    #     'message': '登出成功'
-    # }), 200
+        from app.utils.api_response import error_response
+        return error_response(message='登出過程發生錯誤', error_code='LOGOUT_ERROR', status_code=500)
 
 
 @auth_bp.route('/refresh', methods=['POST'])
