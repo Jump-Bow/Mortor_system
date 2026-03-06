@@ -59,7 +59,7 @@ class TJob(db.Model):
             'act_mem_id': self.act_mem_id,
             'act_mem': self.act_mem,
             'act_mem_name': self.act_mem,
-            'org_name': self.assigned_user.organization.name if self.assigned_user and self.assigned_user.organization else None,
+            'org_name': self.equipment.facility.unitname if self.equipment and self.equipment.facility else None,
             'grade': self.grade, # Renamed
             'mterm': self.mterm,
             'status': status,

@@ -316,14 +316,15 @@
 
     function loadOrganizations() {
         $.ajax({
-            url: '/api/v1/organizations',
+            url: '/api/v1/facilities/list',
             method: 'GET',
             success: function (response) {
                 if (response.status === 'success' && response.data) {
-                    const orgs = response.data.organizations || response.data;
+                    const select = $('#filter-org');
+                    const orgs = response.data.facilities || response.data;
                     if (Array.isArray(orgs)) {
                         orgs.forEach(function (org) {
-                            $('#filter-org').append(`<option value="${org.id}">${org.name}</option>`);
+                            select.append(`<option value="${org.unitid}">${org.unitname}</option>`);
                         });
                     }
                 }

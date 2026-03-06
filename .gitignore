@@ -23,3 +23,5 @@ ENV/
 # 快取檔案 (SonarQube, Jupyter 等)
 .sonar/
 .ipynb_checkpoints/
+my_docker_logs.txt
+docker_logs_tmp.txt

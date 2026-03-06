@@ -211,16 +211,17 @@
 
     function loadOrganizations() {
         $.ajax({
-            url: '/api/v1/organizations/list',
+            url: '/api/v1/facilities/list',
             method: 'GET',
             headers: {
                 'Authorization': 'Bearer ' + localStorage.getItem('token')
             },
             success: function (response) {
-                if (response.status === 'success') {
+                if (response.status === 'success' && response.data) {
                     const select = $('#org-filter');
-                    response.data.organizations.forEach(function (org) {
-                        select.append(`<option value="${org.id}">${org.name}</option>`);
+                    const orgs = response.data.facilities || response.data;
+                    orgs.forEach(function (org) {
+                        select.append(`<option value="${org.unitid}">${org.unitname}</option>`);
                     });
                 }
             }
