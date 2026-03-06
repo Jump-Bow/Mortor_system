@@ -37,6 +37,8 @@ def get_facility_tree(**kwargs):
     }), 200
 
 
+@facilities_bp.route('', methods=['GET'])
+@facilities_bp.route('/', methods=['GET'])
 @facilities_bp.route('/list', methods=['GET'])
 @token_required
 @log_request

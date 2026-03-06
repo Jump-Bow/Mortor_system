@@ -30,6 +30,8 @@ def get_organization_tree(**kwargs):
         }
     }), 200
 
+@organizations_bp.route('', methods=['GET'])
+@organizations_bp.route('/', methods=['GET'])
 @organizations_bp.route('/list', methods=['GET'])
 @token_required
 @log_request

@@ -61,10 +61,15 @@ class Config:
     ITEMS_PER_PAGE = 20
     MAX_ITEMS_PER_PAGE = 1000
     
-    # Cache
+    # Cache & Redis
+    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     USE_REDIS = os.getenv('USE_REDIS', 'false').lower() == 'true'
     CACHE_TYPE = 'redis' if os.getenv('USE_REDIS', 'false').lower() == 'true' else 'SimpleCache'
+    CACHE_REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     CACHE_DEFAULT_TIMEOUT = 300
+    
+    # Token Blacklist（使用 Redis 存儲已撤銷的 Token JTI）
+    TOKEN_BLACKLIST_ENABLED = os.getenv('TOKEN_BLACKLIST_ENABLED', 'true').lower() == 'true'
     
     # Security
     SESSION_COOKIE_SECURE = True
@@ -72,8 +77,14 @@ class Config:
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
     
-    # CORS
-    CORS_ORIGINS = ['http://localhost:3000', 'https://*.googleapis.com']
+    # CORS - 允許的來源域名（各環境可覆蓋）
+    # 注意：不可使用 "*" 搭配 supports_credentials=True（違反 CORS 規範）
+    CORS_ORIGINS = [
+        'http://localhost:3000',
+        'http://localhost:5000',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5000',
+    ]
     
     # API Rate Limiting
     RATELIMIT_ENABLED = True
@@ -127,6 +138,14 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_ECHO = True
     SESSION_COOKIE_SECURE = False
     LOG_LEVEL = 'DEBUG'
+    
+    # CORS - 開發環境允許所有本地域名
+    CORS_ORIGINS = [
+        'http://localhost:3000',
+        'http://localhost:5000',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5000',
+    ]
 
 
 class TestingConfig(Config):
@@ -180,6 +199,12 @@ class ProductionConfig(Config):
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     UPLOAD_PROVIDER = 'gcs'  # 在 Cloud Run 預設切換為 GCS
+    
+    # CORS - 生產環境僅允許正式域名
+    CORS_ORIGINS = [
+        os.getenv('CORS_ORIGIN_1', 'https://fem.chimei.com'),
+        os.getenv('CORS_ORIGIN_2', ''),
+    ]
 
 
 config = {

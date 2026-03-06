@@ -39,6 +39,9 @@ class TEquipment(db.Model):
 class EquitCheckItem(db.Model):
     """設備檢查項目模型 (equit_check_item) - 通用檢查項目"""
     __tablename__ = 'equit_check_item'
+    __table_args__ = (
+        db.Index('ix_equit_check_item_grade_mterm', 'grade', 'mterm'),  # TJob.to_dict() 高頻複合查詢
+    )
     
     item_id = db.Column(db.String(48), primary_key=True, comment='項目ID')
     # equipmentid 已移除

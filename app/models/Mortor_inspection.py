@@ -10,13 +10,13 @@ class TJob(db.Model):
     __tablename__ = 't_job'
     
     actid = db.Column(db.String(48), primary_key=True, comment='工單ID')
-    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), comment='設備編號')
-    mdate = db.Column(db.String(8), nullable=False, comment='開始日期')
+    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), index=True, comment='設備編號')
+    mdate = db.Column(db.String(8), nullable=False, index=True, comment='開始日期')  # 首頁統計按日期查詢
     act_desc = db.Column(db.String(2000), comment='工單內容')
     act_key = db.Column(db.String(30), comment='工單編號')
-    act_mem_id = db.Column(db.String(30), db.ForeignKey('hr_account.id'), comment='負責人ID')
+    act_mem_id = db.Column(db.String(30), db.ForeignKey('hr_account.id'), index=True, comment='負責人ID')  # 工單下載按負責人查詢
     act_mem = db.Column(db.String(30), comment='負責人名稱')
-    grade = db.Column(db.String(8), comment='等級(ABCD)') # Renamed from group
+    grade = db.Column(db.String(8), comment='等級(ABCD)')
     mterm = db.Column(db.String(8), comment='頻率(1M, 3M)')
     
     # Relationships
@@ -59,7 +59,7 @@ class TJob(db.Model):
             'act_mem_id': self.act_mem_id,
             'act_mem': self.act_mem,
             'act_mem_name': self.act_mem,
-            'org_name': self.assigned_user.organization.name if self.assigned_user and self.assigned_user.organization else None,
+            'org_name': self.equipment.facility.unitname if self.equipment and self.equipment.facility else None,
             'grade': self.grade, # Renamed
             'mterm': self.mterm,
             'status': status,
