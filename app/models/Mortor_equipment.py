@@ -51,7 +51,7 @@ class EquitCheckItem(db.Model):
     status_type = db.Column(db.String(48), comment='項目狀態')
     max_v = db.Column(db.String(48), comment='標準上限')
     min_v = db.Column(db.String(48), comment='標準下限')
-    grade = db.Column('group', db.String(24), comment='等級(ABCD)') # Renamed from group
+    grade = db.Column(db.String(24), comment='等級(ABCD)') # Renamed from group
     mterm = db.Column(db.String(24), comment='頻率(1M, 3M)')
     unit = db.Column(db.String(24), comment='單位(mm, C)')
     
