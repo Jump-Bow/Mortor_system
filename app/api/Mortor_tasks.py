@@ -73,7 +73,7 @@ def download_tasks(**kwargs):
                     'max_v': item.max_v,
                     'min_v': item.min_v,
                     'sort_order': item.sort_order,
-                    'group': item.group,
+                    'grade': item.grade,
                     'mterm': item.mterm,
                     'unit': item.unit,
                     'data_type': '數值' if item.max_v or item.min_v else '文字',
@@ -106,7 +106,7 @@ def download_tasks(**kwargs):
             'act_desc': task.act_desc,
             'act_mem_id': task.act_mem_id,
             'act_mem': assigned_user.name if assigned_user else task.act_mem,
-            'group': task.group,
+            'grade': task.grade,
             'mterm': task.mterm,
             'completion_rate': round(completion_rate, 1),
             'unitid': equipment.unitid if equipment else None,
@@ -213,7 +213,7 @@ def list_tasks(**kwargs):
                     'max_v': item.max_v,
                     'min_v': item.min_v,
                     'sort_order': item.sort_order,
-                    'group': item.group,
+                    'grade': item.grade,
                     'mterm': item.mterm,
                     'unit': item.unit,
                     'data_type': '數值' if item.max_v or item.min_v else '文字',
@@ -240,7 +240,7 @@ def list_tasks(**kwargs):
             'act_desc': task.act_desc,
             'act_mem_id': task.act_mem_id,
             'act_mem': assigned_user.name if assigned_user else task.act_mem,
-            'group': task.group,
+            'grade': task.grade,
             'mterm': task.mterm,
             'completion_rate': round(completion_rate, 1),
             'unitid': equipment.unitid if equipment else None,
@@ -299,7 +299,7 @@ def get_task_detail(task_id, **kwargs):
         'act_mem_id': task.act_mem_id,
         'act_mem': assigned_user.name if assigned_user else task.act_mem,
         'mdate': task.mdate,
-        'group': task.group,
+        'grade': task.grade,
         'mterm': task.mterm,
     }
     
@@ -374,7 +374,7 @@ def create_task(**kwargs):
         act_mem=user.name,
         mdate=mdate_val,
         act_desc=data.get('act_desc') or data.get('actdesc'),
-        group=data.get('group') or data.get('group_level'),
+        grade=data.get('grade') or data.get('grade_level') or data.get('group') or data.get('group_level'),
         mterm=data.get('mterm'),
     )
     
@@ -461,11 +461,15 @@ def update_task(task_id, **kwargs):
     elif 'actdesc' in data:
         task.act_desc = data['actdesc']
         
-    # Update group
-    if 'group' in data:
-        task.group = data['group']
+    # Update grade
+    if 'grade' in data:
+        task.grade = data['grade']
+    elif 'grade_level' in data:
+        task.grade = data['grade_level']
+    elif 'group' in data:
+        task.grade = data['group']
     elif 'group_level' in data:
-        task.group = data['group_level']
+        task.grade = data['group_level']
     
     # Update mterm
     if 'mterm' in data:

@@ -92,7 +92,7 @@ def create_app(config_name: str = None) -> Flask:
         from app.models import (
             TOrganization, HrOrganization, HrAccount, Role,
             TEquipment, EquitCheckItem, TJob, InspectionResult,
-            AbnormalCases, SysLog, UserLog
+            AbnormalCases, SystemLog, UserLog
         )
         return {
             'db': db,
@@ -105,7 +105,7 @@ def create_app(config_name: str = None) -> Flask:
             'TJob': TJob,
             'InspectionResult': InspectionResult,
             'AbnormalCases': AbnormalCases,
-            'SysLog': SysLog,
+            'SystemLog': SystemLog,
             'UserLog': UserLog,
         }
     

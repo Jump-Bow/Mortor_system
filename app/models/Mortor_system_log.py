@@ -7,7 +7,7 @@ from datetime import datetime
 import uuid
 
 
-class SysLog(db.Model):
+class SystemLog(db.Model):
     """系統日誌模型 (sys_log)"""
     __tablename__ = 'sys_log'
     
@@ -17,7 +17,7 @@ class SysLog(db.Model):
     module = db.Column(db.String(48), comment='模組名稱')
     
     def __repr__(self):
-        return f'<SysLog {self.log_id} - {self.level}>'
+        return f'<SystemLog {self.log_id} - {self.level}>'
     
     def to_dict(self):
         return {
@@ -31,7 +31,7 @@ class SysLog(db.Model):
     def create(level: str, module: str, message: str = None, exception: str = None):
         """建立系統日誌"""
         try:
-            log = SysLog(
+            log = SystemLog(
                 log_id=str(uuid.uuid4()),
                 level=level,
                 module=module,

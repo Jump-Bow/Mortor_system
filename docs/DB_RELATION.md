@@ -162,5 +162,5 @@ erDiagram
 | `AbnormalCases` | `Mortor_abnormal.py` | `AbnormalCases` |
 | `hr_organization` | `Mortor_organization.py` | `HrOrganization` |
 | `hr_account` | `Mortor_user.py` | `HrAccount` |
-| `sys_log` | `Mortor_system_log.py` | `SysLog` |
+| `sys_log` | `Mortor_system_log.py` | `SystemLog` |
 | `user_log` | `Mortor_system_log.py` | `UserLog` |

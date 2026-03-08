@@ -105,8 +105,8 @@ def normal_user(session, user_role):
 def organization(session):
     """Create test organization"""
     org = HrOrganization(
-        organizationid='ORG001',
-        organizationname='測試組織'
+        id='ORG001',
+        name='測試組織'
     )
     session.add(org)
     session.commit()
@@ -141,15 +141,16 @@ def equipment(session, facility):
 
 
 @pytest.fixture
-def equipment_check_item(session, equipment):
+def equipment_check_item(session):
     """Create test equipment check item"""
     item = EquitCheckItem(
         item_id='ITEM001',
-        equipmentid=equipment.id,
         item_name='溫度',
-        sort_order=1,
+        sort_order='1',
         max_v='80',
         min_v='30',
+        grade='A',
+        mterm='1M'
     )
     session.add(item)
     session.commit()

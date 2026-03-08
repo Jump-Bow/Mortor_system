@@ -182,7 +182,7 @@
                         <td>${r.id}</td>
                         <td>${r.name}</td>
                         <td>${r.org_name || '-'}</td>
-                        <td>${r.group || '-'}</td>
+                        <td>${r.grade || '-'}</td>
                         <td>${r.last_inspection_date || '-'}</td>
                         <td>${r.avg_value != null ? r.avg_value.toFixed(2) : '-'}</td>
                         <td><span class="badge ${r.abnormal_count > 0 ? 'badge-danger' : 'badge-secondary'}">${r.abnormal_count}</span></td>

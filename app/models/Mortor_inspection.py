@@ -16,7 +16,7 @@ class TJob(db.Model):
     act_key = db.Column(db.String(30), comment='工單編號')
     act_mem_id = db.Column(db.String(30), db.ForeignKey('hr_account.id'), index=True, comment='負責人ID')  # 工單下載按負責人查詢
     act_mem = db.Column(db.String(30), comment='負責人名稱')
-    grade = db.Column(db.String(8), comment='等級(ABCD)')
+    grade = db.Column('group', db.String(8), comment='等級(ABCD)')
     mterm = db.Column(db.String(8), comment='頻率(1M, 3M)')
     
     # Relationships

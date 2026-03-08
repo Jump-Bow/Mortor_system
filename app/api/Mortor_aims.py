@@ -45,7 +45,7 @@ def aims_progress_list(**kwargs):
         if end_date:
             query = query.filter(TJob.mdate <= end_date.replace('-', ''))
         if motor_type:
-            query = query.filter(TJob.group == motor_type)
+            query = query.filter(TJob.grade == motor_type)
         if mterm:
             query = query.filter(TJob.mterm == mterm)
         if act_key:
@@ -207,7 +207,7 @@ def aims_progress_export(**kwargs):
         if end_date:
             query = query.filter(TJob.mdate <= end_date.replace('-', ''))
         if motor_type:
-            query = query.filter(TJob.group == motor_type)
+            query = query.filter(TJob.grade == motor_type)
         if mterm:
             query = query.filter(TJob.mterm == mterm)
 
@@ -225,7 +225,7 @@ def aims_progress_export(**kwargs):
                 job_dict.get('mdate', ''),
                 job_dict.get('org_name', ''),
                 job_dict.get('equipment_name', ''),
-                job_dict.get('group', ''),
+                job_dict.get('grade', ''),
                 job_dict.get('mterm', ''),
                 job_dict.get('act_mem', ''),
                 job_dict.get('status', ''),
