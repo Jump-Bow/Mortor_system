@@ -8,7 +8,7 @@ from datetime import datetime
 from flask import current_app, request
 from functools import wraps
 from typing import Dict, Optional, Tuple
-from app.models.Mortor_system_log import SysLog
+from app.models.Mortor_system_log import SystemLog
 
 
 class JWTHandler:
@@ -156,7 +156,7 @@ def token_required(f):
         token = JWTHandler.get_token_from_header()
         
         if not token:
-            SysLog.create(level='WARN', module='Auth')
+            SystemLog.create(level='WARN', module='Auth')
             return {
                 'status': 'error',
                 'error_code': 'UNAUTHORIZED',
@@ -167,7 +167,7 @@ def token_required(f):
         
         if not payload:
             msg = 'Token 無效或已過期' if error == 'EXPIRED' else '無效的 Token'
-            SysLog.create(level='WARN', module='Auth')
+            SystemLog.create(level='WARN', module='Auth')
             return {
                 'status': 'error',
                 'error_code': 'UNAUTHORIZED',
@@ -176,7 +176,7 @@ def token_required(f):
         
         # Check if access token
         if payload.get('type') != 'access':
-            SysLog.create(level='WARN', module='Auth')
+            SystemLog.create(level='WARN', module='Auth')
             return {
                 'status': 'error',
                 'error_code': 'UNAUTHORIZED',
@@ -188,7 +188,7 @@ def token_required(f):
         if jti:
             from app.services.token_blacklist import TokenBlacklistService
             if TokenBlacklistService.is_blacklisted(jti):
-                SysLog.create(level='WARN', module='Auth')
+                SystemLog.create(level='WARN', module='Auth')
                 return {
                     'status': 'error',
                     'error_code': 'TOKEN_REVOKED',
@@ -199,7 +199,7 @@ def token_required(f):
         from app.models.Mortor_user import HrAccount
         user = HrAccount.query.get(payload['user_id'])
         if not user:
-            SysLog.create(level='WARN', module='Auth')
+            SystemLog.create(level='WARN', module='Auth')
             return {
                 'status': 'error',
                 'error_code': 'UNAUTHORIZED',
@@ -227,7 +227,7 @@ def role_required(*allowed_roles):
             current_user = kwargs.get('current_user')
             
             if not current_user:
-                SysLog.create(level='WARN', module='Auth')
+                SystemLog.create(level='WARN', module='Auth')
                 return {
                     'status': 'error',
                     'error_code': 'FORBIDDEN',
