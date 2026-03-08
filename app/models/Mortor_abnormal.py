@@ -61,7 +61,7 @@ class AbnormalCases(db.Model):
             'abn_msg': self.abn_msg,
             'abn_solution': self.abn_solution,
             'processed_memid': self.processed_memid,
-            'processed_memname': self.responsible_user.name if self.responsible_user else None,
+            'processed_memname': self.responsible_user.name if self.responsible_user else (self.processed_memid if self.processed_memid else '未指派'),
             'processed_time': self.processed_time.isoformat() if self.processed_time else None,
             'tracking_id': tracking_id,
             # abnormal_type will be enriched by API

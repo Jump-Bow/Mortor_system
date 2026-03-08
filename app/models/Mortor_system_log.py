@@ -15,6 +15,8 @@ class SystemLog(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True, comment='時間')
     level = db.Column(db.String(48), nullable=False, comment='INFO/WARN/ERROR')  
     module = db.Column(db.String(48), comment='模組名稱')
+    message = db.Column(db.String(2000), comment='日誌訊息')
+    exception = db.Column(db.Text, comment='異常堆疊')
     
     def __repr__(self):
         return f'<SystemLog {self.log_id} - {self.level}>'
@@ -25,6 +27,8 @@ class SystemLog(db.Model):
             'timestamp': self.timestamp.isoformat() if self.timestamp else None,
             'level': self.level,
             'module': self.module,
+            'message': self.message,
+            'exception': self.exception,
         }
         
     @staticmethod
@@ -35,6 +39,8 @@ class SystemLog(db.Model):
                 log_id=str(uuid.uuid4()),
                 level=level,
                 module=module,
+                message=message,
+                exception=exception,
             )
             db.session.add(log)
             db.session.commit()

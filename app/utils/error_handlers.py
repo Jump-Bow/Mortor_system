@@ -67,7 +67,12 @@ def register_error_handlers(app):
         # 資料庫層級的錯誤（不要將詳細錯誤訊息吐給前端，保護內部 SQL 架構）
         app.logger.error(f"Database Error: {str(e)}")
         from app.models.Mortor_system_log import SystemLog
-        SystemLog.create(level='ERROR', module='Database', message=f'DB Error occurred')
+        SystemLog.create(
+            level='ERROR', 
+            module='Database', 
+            message='資料庫存取異常',
+            exception=str(e)
+        )
         
         return error_response(
             message='伺服器資料庫發生異常，請聯絡系統管理員',
@@ -87,8 +92,14 @@ def register_error_handlers(app):
             )
             
         app.logger.exception(f"Unhandled Exception: {str(e)}")
+        import traceback
         from app.models.Mortor_system_log import SystemLog
-        SystemLog.create(level='ERROR', module='System', message=f'Unhandled Exception: {type(e).__name__}')
+        SystemLog.create(
+            level='ERROR', 
+            module='System', 
+            message=f'系統未預期錯誤: {type(e).__name__}',
+            exception=traceback.format_exc()
+        )
         
         return error_response(
             message='伺服器發生非預期錯誤 (Internal Server Error)',
