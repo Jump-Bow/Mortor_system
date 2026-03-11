@@ -180,8 +180,12 @@ class ProductionConfig(Config):
     DB_USER = os.getenv('PROD_DB_USER', 'fem_admin')
     DB_PASSWORD = os.getenv('PROD_DB_PASSWORD', '')
     
+    import urllib.parse
+    # URL encode password to handle special characters (@, :, /, etc.)
+    encoded_password = urllib.parse.quote_plus(DB_PASSWORD) if DB_PASSWORD else ''
+    
     SQLALCHEMY_DATABASE_URI = (
-        f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_SERVER}:{DB_PORT}/{DB_NAME}"
+        f"postgresql+psycopg2://{DB_USER}:{encoded_password}@{DB_SERVER}:{DB_PORT}/{DB_NAME}"
     )
     
     # Enhanced Security for Production

@@ -6,10 +6,11 @@ import os
 import random
 from datetime import datetime, timedelta, date
 from app import create_app, db
-from app.models.Mortor_user import HrAccount, Role
-from app.models.Mortor_organization import HrOrganization, TOrganization
-from app.models.Mortor_equipment import TEquipment, EquitCheckItem
-from app.models.Mortor_inspection import TJob, InspectionResult
+from app.models import (
+    HrAccount, Role, HrOrganization, TOrganization, 
+    TEquipment, EquitCheckItem, TJob, InspectionResult,
+    AbnormalCases, SystemLog, UserLog
+)
 
 # ==============================================================================
 # 1. 輔助函數：日期生成
