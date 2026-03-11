@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,105 +16,130 @@
         .login-page {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
+
         .login-box {
             margin-top: 10vh;
         }
+
         .card {
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         }
+
         .login-logo a {
             color: #fff;
             font-weight: bold;
         }
+
         .login-card-body {
             border-radius: 15px;
         }
     </style>
 </head>
+
 <body class="hold-transition login-page">
-<div class="login-box">
-    <div class="login-logo">
-        <a href="#"><b>FEM</b> 設備保養管理系統</a>
-    </div>
-    
-    <div class="card">
-        <div class="card-body login-card-body">
-            <p class="login-box-msg">請登入系統以繼續</p>
+    <div class="login-box">
+        <div class="login-logo">
+            <a href="#"><b>FEM</b> 設備保養管理系統</a>
+        </div>
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
+        <div class="card">
+            <div class="card-body login-card-body">
+                <p class="login-box-msg">請登入系統以繼續</p>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
-                        {{ message }}
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    {% endfor %}
+                {% for category, message in messages %}
+                <div
+                    class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                {% endfor %}
                 {% endif %}
-            {% endwith %}
+                {% endwith %}
 
-            <form action="{{ url_for('web.login') }}" method="post">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                
-                <div class="input-group mb-3">
-                    <input type="text" class="form-control" name="username" placeholder="使用者名稱" required>
-                    <div class="input-group-append">
-                        <div class="input-group-text">
-                            <span class="fas fa-user"></span>
+                <form action="{{ url_for('web.login') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" name="username" placeholder="使用者名稱" required>
+                        <div class="input-group-append">
+                            <div class="input-group-text">
+                                <span class="fas fa-user"></span>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="input-group mb-3">
-                    <input type="password" class="form-control" name="password" placeholder="密碼" required>
-                    <div class="input-group-append">
-                        <div class="input-group-text">
-                            <span class="fas fa-lock"></span>
+
+                    <div class="input-group mb-3">
+                        <input type="password" class="form-control" name="password" placeholder="密碼" required>
+                        <div class="input-group-append">
+                            <div class="input-group-text">
+                                <span class="fas fa-lock"></span>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-8">
-                        <div class="icheck-primary">
-                            <input type="checkbox" id="remember" name="remember">
-                            <label for="remember">
-                                記住我
-                            </label>
+
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="icheck-primary">
+                                <input type="checkbox" id="remember" name="remember">
+                                <label for="remember">
+                                    記住我
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <button type="submit" class="btn btn-primary btn-block">登入</button>
                         </div>
                     </div>
-                    <div class="col-4">
-                        <button type="submit" class="btn btn-primary btn-block">登入</button>
-                    </div>
+                </form>
+
+                <div class="social-auth-links text-center mb-3 mt-3">
+                    <p>- 或 -</p>
+                    <button type="button" class="btn btn-block btn-primary" onclick="azureADLogin()">
+                        <i class="fab fa-microsoft mr-2"></i> 使用 Azure AD 登入
+                    </button>
                 </div>
-            </form>
 
-            <!-- <div class="social-auth-links text-center mb-3 mt-3">
-                <p>- 或 -</p>
-                <button type="button" class="btn btn-block btn-primary" onclick="azureADLogin()">
-                    <i class="fab fa-microsoft mr-2"></i> 使用 Azure AD 登入
-                </button>
-            </div> -->
-
+            </div>
         </div>
     </div>
-</div>
 
-<!-- jQuery (Local) -->
-<script src="{{ url_for('static', filename='vendor/jquery/jquery-3.6.0.min.js') }}"></script>
-<!-- Bootstrap 4 (Local) -->
-<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-4.6.0.bundle.min.js') }}"></script>
-<!-- AdminLTE App (Local) -->
-<script src="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.js') }}"></script>
+    <!-- jQuery (Local) -->
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery-3.6.0.min.js') }}"></script>
+    <!-- Bootstrap 4 (Local) -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-4.6.0.bundle.min.js') }}"></script>
+    <!-- AdminLTE App (Local) -->
+    <script src="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.js') }}"></script>
 
-<script>
-function azureADLogin() {
-    alert('Azure AD 登入功能開發中');
-    // TODO: Implement Azure AD login
-}
-</script>
+    <script>
+        function azureADLogin() {
+            // 呼叫後端 API 取得 Azure AD 授權網址
+            $.ajax({
+                url: '/api/v1/auth/azure/login',
+                type: 'GET',
+                success: function (response) {
+                    if (response.status === 'success' && response.data.auth_url) {
+                        // 導向至微軟登入頁面
+                        window.location.href = response.data.auth_url;
+                    } else {
+                        alert('無法取得 Azure AD 登入網址：' + (response.message || '未知錯誤'));
+                    }
+                },
+                error: function (xhr) {
+                    let errorMsg = '無法連接至伺服器或 Azure AD 未啟用';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    alert('Azure AD 登入失敗：' + errorMsg);
+                }
+            });
+        }
+    </script>
 
 </body>
+
 </html>
