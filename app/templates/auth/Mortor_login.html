@@ -41,6 +41,7 @@
         <div class="card-body login-card-body">
             <p class="login-box-msg">請登入系統以繼續</p>
 
+            <!-- Flask flash 訊息 (Local 登入用) -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -53,6 +54,14 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
+
+            <!-- Azure AD 錯誤訊息 (透過 URL 參數傳遞，避免跨網域 Session 遺失) -->
+            <div id="azure-error-alert" class="alert alert-danger alert-dismissible fade show" style="display: none;">
+                <span id="azure-error-msg"></span>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
 
             <form action="{{ url_for('web.login') }}" method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -90,12 +99,12 @@
                 </div>
             </form>
 
-            <!-- <div class="social-auth-links text-center mb-3 mt-3">
+            <div class="social-auth-links text-center mb-3 mt-3">
                 <p>- 或 -</p>
                 <button type="button" class="btn btn-block btn-primary" onclick="azureADLogin()">
                     <i class="fab fa-microsoft mr-2"></i> 使用 Azure AD 登入
                 </button>
-            </div> -->
+            </div>
 
         </div>
     </div>
@@ -109,9 +118,41 @@
 <script src="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.js') }}"></script>
 
 <script>
+// 頁面載入時檢查 URL 參數是否包含 Azure AD 錯誤訊息
+$(document).ready(function() {
+    var params = new URLSearchParams(window.location.search);
+    var azureError = params.get('azure_error');
+    if (azureError) {
+        $('#azure-error-msg').text(azureError);
+        $('#azure-error-alert').show();
+        // 清除 URL 參數（避免重新整理時重複顯示）
+        if (window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+});
+
 function azureADLogin() {
-    alert('Azure AD 登入功能開發中');
-    // TODO: Implement Azure AD login
+    // 呼叫後端 API 取得 Azure AD 授權網址
+    $.ajax({
+        url: '/api/v1/auth/azure/login',
+        type: 'GET',
+        success: function(response) {
+            if (response.status === 'success' && response.data.auth_url) {
+                // 導向至微軟登入頁面
+                window.location.href = response.data.auth_url;
+            } else {
+                alert('無法取得 Azure AD 登入網址：' + (response.message || '未知錯誤'));
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = '無法連接至伺服器或 Azure AD 未啟用';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMsg = xhr.responseJSON.message;
+            }
+            alert('Azure AD 登入失敗：' + errorMsg);
+        }
+    });
 }
 </script>
 
