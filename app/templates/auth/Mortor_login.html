@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,54 +15,46 @@
         .login-page {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-
         .login-box {
             margin-top: 10vh;
         }
-
         .card {
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
-
         .login-logo a {
             color: #fff;
             font-weight: bold;
         }
-
         .login-card-body {
             border-radius: 15px;
         }
     </style>
 </head>
-
 <body class="hold-transition login-page">
-    <div class="login-box">
-        <div class="login-logo">
-            <a href="#"><b>FEM</b> 設備保養管理系統</a>
-        </div>
+<div class="login-box">
+    <div class="login-logo">
+        <a href="#"><b>FEM</b> 設備保養管理系統</a>
+    </div>
+    
+    <div class="card">
+        <div class="card-body login-card-body">
+            <p class="login-box-msg">請登入系統以繼續</p>
 
-        <div class="card">
-            <div class="card-body login-card-body">
-                <p class="login-box-msg">請登入系統以繼續</p>
-
-
-                <!-- Flask flash 訊息 (Local 登入用) -->
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                {% with messages = get_flashed_messages(with_categories=true) %}
+            <!-- Flask flash 訊息 (Local 登入用) -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                {% for category, message in messages %}
-                <div
-                    class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
-                    {{ message }}
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                {% endfor %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    {% endfor %}
                 {% endif %}
-
             {% endwith %}
+
             <!-- Azure AD 錯誤訊息 (透過 URL 參數傳遞，避免跨網域 Session 遺失) -->
             <div id="azure-error-alert" class="alert alert-danger alert-dismissible fade show" style="display: none;">
                 <span id="azure-error-msg"></span>
@@ -80,35 +71,33 @@
                     <div class="input-group-append">
                         <div class="input-group-text">
                             <span class="fas fa-user"></span>
-
-
                         </div>
                     </div>
-
-                    <div class="input-group mb-3">
-                        <input type="password" class="form-control" name="password" placeholder="密碼" required>
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-lock"></span>
-                            </div>
+                </div>
+                
+                <div class="input-group mb-3">
+                    <input type="password" class="form-control" name="password" placeholder="密碼" required>
+                    <div class="input-group-append">
+                        <div class="input-group-text">
+                            <span class="fas fa-lock"></span>
                         </div>
                     </div>
-
-                    <div class="row">
-                        <div class="col-8">
-                            <div class="icheck-primary">
-                                <input type="checkbox" id="remember" name="remember">
-                                <label for="remember">
-                                    記住我
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <button type="submit" class="btn btn-primary btn-block">登入</button>
+                </div>
+                
+                <div class="row">
+                    <div class="col-8">
+                        <div class="icheck-primary">
+                            <input type="checkbox" id="remember" name="remember">
+                            <label for="remember">
+                                記住我
+                            </label>
                         </div>
                     </div>
-                </form>
-
+                    <div class="col-4">
+                        <button type="submit" class="btn btn-primary btn-block">登入</button>
+                    </div>
+                </div>
+            </form>
 
             <div class="social-auth-links text-center mb-3 mt-3">
                 <p>- 或 -</p>
@@ -117,8 +106,6 @@
                 </button>
             </div>
 
-
-            </div>
         </div>
     </div>
 </div>
@@ -170,5 +157,4 @@ function azureADLogin() {
 </script>
 
 </body>
-
 </html>
