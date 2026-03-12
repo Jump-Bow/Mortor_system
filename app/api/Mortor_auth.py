@@ -59,39 +59,37 @@ def azure_callback():
     Microsoft 登入成功後會自動將使用者導向此端點，
     系統將使用 authorization code 換取 token 並嘗試登入使用者，
     不論失敗或成功，都會重新導向回網頁畫面並顯示適當的訊息。
+    
+    注意：因為從微軟跨網域重導向回來時 SameSite=Strict 會導致
+    Session 遺失，所以錯誤訊息改用 URL Query Parameter 傳遞。
     """
     # 檢查是否有錯誤回傳 (例如使用者取消登入)
     error = request.args.get('error')
     if error:
         error_desc = request.args.get('error_description', error)
         current_app.logger.warning(f'Azure AD callback error: {error_desc}')
-        flash(f'Azure AD 認證失敗: {error_desc}', 'error')
-        return redirect(url_for('web.login'))
+        return redirect(url_for('web.login', azure_error=f'Azure AD 認證失敗: {error_desc}'))
 
     # 取得 authorization code
     code = request.args.get('code')
     if not code:
-        flash('Azure AD 認證失敗：未提供授權碼', 'error')
-        return redirect(url_for('web.login'))
+        return redirect(url_for('web.login', azure_error='Azure AD 認證失敗：未提供授權碼'))
 
     # 用 code 換取 token
     result, token_error = AzureADHandler.acquire_token_by_code(code)
     if token_error:
-        flash(token_error, 'error')
-        return redirect(url_for('web.login'))
+        return redirect(url_for('web.login', azure_error=token_error))
 
     # 從 token 提取使用者帳號
     username = AzureADHandler.get_username_from_token(result)
     if not username:
-        flash('Azure AD 認證失敗：無法取得使用者帳號', 'error')
-        return redirect(url_for('web.login'))
+        return redirect(url_for('web.login', azure_error='Azure AD 認證失敗：無法取得使用者帳號'))
 
     # 以帳號查詢資料庫
     user = HrAccount.query.filter_by(id=username).first()
     if not user:
         current_app.logger.warning(f'Azure AD user not found in database: {username}')
-        flash('此帳號未授權使用本系統', 'error')
-        return redirect(url_for('web.login'))
+        return redirect(url_for('web.login', azure_error='此帳號未授權使用本系統'))
 
     # 產生本系統 JWT Token
     access_token, refresh_token = JWTHandler.generate_token(
@@ -110,13 +108,13 @@ def azure_callback():
 
     current_app.logger.info(f'User {user.id} logged in via Azure AD')
 
-    from flask_login import login_user
-    from flask import session
+    from flask_login import login_user as flask_login_user
+    from flask import session as flask_session
     
     # 執行網頁使用者登入
-    login_user(user)
-    session['api_token'] = access_token
-    session['refresh_token'] = refresh_token
+    flask_login_user(user)
+    flask_session['api_token'] = access_token
+    flask_session['refresh_token'] = refresh_token
 
     flash('Azure AD 登入成功！', 'success')
     return redirect(url_for('web.dashboard'))
