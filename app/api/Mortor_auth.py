@@ -2,7 +2,7 @@
 Authentication API Blueprint
 認證與授權 API（支援 Local 與 Azure AD 登入）
 """
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, redirect, url_for, flash, session
 from app.models.Mortor_user import HrAccount
 from app.models.Mortor_system_log import UserLog
 from app.auth.jwt_handler import JWTHandler, token_required
@@ -57,66 +57,46 @@ def azure_callback():
     Azure AD OAuth 回調端點
 
     Microsoft 登入成功後會自動將使用者導向此端點，
-    並帶入 authorization code。系統用此 code 換取 token，
-    再以 preferred_username 比對 hr_account.id 發放本系統 JWT。
-
-    Query Parameters:
-        - code: Azure AD 回傳的授權碼 (由 Microsoft 自動帶入)
-        - error: 錯誤代碼 (若使用者取消或認證失敗)
-        - error_description: 錯誤描述
-
-    Response:
-        - token: JWT Access Token
-        - refresh_token: JWT Refresh Token
-        - user: 使用者資訊
+    系統將使用 authorization code 換取 token 並嘗試登入使用者，
+    不論失敗或成功，都會重新導向回網頁畫面並顯示適當的訊息。
     """
     # 檢查是否有錯誤回傳 (例如使用者取消登入)
     error = request.args.get('error')
     if error:
         error_desc = request.args.get('error_description', error)
         current_app.logger.warning(f'Azure AD callback error: {error_desc}')
-        return jsonify({
-            'status': 'error',
-            'message': f'Azure AD 認證失敗: {error_desc}'
-        }), 400
+        flash(f'Azure AD 認證失敗: {error_desc}', 'error')
+        return redirect(url_for('web.login'))
 
     # 取得 authorization code
     code = request.args.get('code')
     if not code:
-        return jsonify({
-            'status': 'error',
-            'message': 'Azure AD 認證失敗：未提供授權碼'
-        }), 400
+        flash('Azure AD 認證失敗：未提供授權碼', 'error')
+        return redirect(url_for('web.login'))
 
     # 用 code 換取 token
     result, token_error = AzureADHandler.acquire_token_by_code(code)
     if token_error:
-        return jsonify({
-            'status': 'error',
-            'message': token_error
-        }), 401
+        flash(token_error, 'error')
+        return redirect(url_for('web.login'))
 
     # 從 token 提取使用者帳號
     username = AzureADHandler.get_username_from_token(result)
     if not username:
-        return jsonify({
-            'status': 'error',
-            'message': 'Azure AD 認證失敗：無法取得使用者帳號'
-        }), 401
+        flash('Azure AD 認證失敗：無法取得使用者帳號', 'error')
+        return redirect(url_for('web.login'))
 
     # 以帳號查詢資料庫
     user = HrAccount.query.filter_by(id=username).first()
     if not user:
         current_app.logger.warning(f'Azure AD user not found in database: {username}')
-        return jsonify({
-            'status': 'error',
-            'message': '此帳號未授權使用本系統'
-        }), 401
+        flash('此帳號未授權使用本系統', 'error')
+        return redirect(url_for('web.login'))
 
     # 產生本系統 JWT Token
     access_token, refresh_token = JWTHandler.generate_token(
         user.id,
-        user.id,
+        user.name if hasattr(user, 'name') else user.id,
         'User'
     )
 
@@ -130,15 +110,16 @@ def azure_callback():
 
     current_app.logger.info(f'User {user.id} logged in via Azure AD')
 
-    return jsonify({
-        'status': 'success',
-        'data': {
-            'token': access_token,
-            'refresh_token': refresh_token,
-            'expires_in': int(current_app.config['JWT_ACCESS_TOKEN_EXPIRES'].total_seconds()),
-            'user': user.to_dict()
-        }
-    }), 200
+    from flask_login import login_user
+    from flask import session
+    
+    # 執行網頁使用者登入
+    login_user(user)
+    session['api_token'] = access_token
+    session['refresh_token'] = refresh_token
+
+    flash('Azure AD 登入成功！', 'success')
+    return redirect(url_for('web.dashboard'))
 
 
 # ==============================================================================
