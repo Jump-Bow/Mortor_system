@@ -133,6 +133,8 @@ def init_database():
 
             # 7. 建立通用檢查項目 (EquitCheckItem) - 範例資料/預設規格
             print("檢查通用檢查項目 (預設規格)...")
+            # item_id 格式："{grade}_{mterm}_{sort_order}" 確保跨等級唯一，冪等性正確
+            # 格式範例：A_1M_001, B_3M_011, D_4M_005
             specs_data = [
                 ('001', '前軸承溫度', None, '70', '℃', 'A', '1M'), ('002', '馬達本體溫度', None, '80', '℃', 'A', '1M'),
                 ('003', '後軸承溫度', None, '70', '℃', 'A', '1M'), ('004', 'MIH振動量測', None, '4', 'mm/s', 'A', '1M'),
@@ -159,11 +161,12 @@ def init_database():
                 ('009', '馬達異響', '聲音項目', None, None, 'D', '4M'), ('010', '油位是否於正常範圍', '油位檢查(液壓油位)', None, None, 'D', '4M'),
                 ('011', '注油', '注油(牛油)', None, None, 'D', '4M')
             ]
-            
-            for idx, row in enumerate(specs_data, 1):
-                item_id = str(idx)
+
+            for row in specs_data:
+                sort_order, item_name, item_desc, max_v, unit, grade, mterm = row
+                # KEY FIX: item_id 用複合 key 確保各等級/週期的相同項目唯一
+                item_id = f"{grade}_{mterm}_{sort_order}"
                 if not EquitCheckItem.query.get(item_id):
-                    sort_order, item_name, item_desc, max_v, unit, grade, mterm = row
                     status_type = 'status' if item_desc in ['聲音項目', '油位檢查(液壓油位)', '注油(牛油)'] else 'normal'
                     db.session.add(EquitCheckItem(
                         item_id=item_id, item_name=item_name, item_desc=item_desc,
@@ -179,7 +182,7 @@ def init_database():
                 available_specs = [('A', '1M'), ('B', '1M'), ('B', '3M'), ('C', '1M'), ('C', '3M'), ('D', '4M')]
                 task_count = 0
                 equip_list = TEquipment.query.all()
-                
+
                 for m_off in [2, 1, 0]:
                     for eq in equip_list:
                         for d in [5, 20]:
@@ -204,27 +207,57 @@ def init_database():
                 print("填寫初始巡檢量測結果 (範例)...")
                 today_str = date.today().strftime('%Y%m%d')
                 past_jobs = TJob.query.filter(TJob.mdate < today_str).all()
-                
+
                 for job in past_jobs:
+                    # item_id 格式已與步驟 7 對齊："{grade}_{mterm}_{sort_order}"
                     matched_items = EquitCheckItem.query.filter_by(grade=job.grade, mterm=job.mterm).all()
                     for item in matched_items:
                         measured = "正常"
-                        status = 1
+                        # is_out_of_spec 語義：0=正常(在規格內), 2=異常(超標)
+                        # 前端用 is_out_of_spec > 0 判斷是否異常，0=正常不顯示紅色
+                        status = 0
                         if item.status_type == 'normal':
                             max_val = float(item.max_v) if item.max_v else 100.0
                             val = round(random.uniform(0.1, max_val * 0.9), 2) if random.random() > 0.1 else round(max_val * 1.2, 1)
-                            status = 1 if val <= max_val else 2
+                            status = 0 if val <= max_val else 2   # 0=正常, 2=異常
                             measured = str(val)
                         else:
                             if random.random() > 0.95:
-                                measured = "異常"; status = 2
-                        
+                                measured = "異常"
+                                status = 2
+
                         db.session.add(InspectionResult(
                             actid=job.actid, item_id=item.item_id, equipmentid=job.equipmentid,
                             measured_value=measured, is_out_of_spec=status,
                             act_mem_id=job.act_mem_id,
                             act_time=datetime.strptime(job.mdate, '%Y%m%d') + timedelta(hours=random.randint(9, 16))
                         ))
+
+                # 先 commit InspectionResult，以滿足 AbnormalCases 的複合 FK 約束
+                db.session.commit()
+                print(f" - InspectionResult: {InspectionResult.query.count()} 筆")
+
+                # 第二步：對異常結果建立 AbnormalCases 追蹤紀錄
+                print("建立異常追蹤案件...")
+                for job in past_jobs:
+                    matched_items = EquitCheckItem.query.filter_by(grade=job.grade, mterm=job.mterm).all()
+                    for item in matched_items:
+                        result = InspectionResult.query.filter_by(
+                            actid=job.actid, item_id=item.item_id
+                        ).first()
+                        if result and result.is_out_of_spec and result.is_out_of_spec > 0:
+                            abn_msg = (
+                                f"{item.item_name} 量測值 {result.measured_value} 超出上限 {item.max_v}"
+                                if item.max_v else f"{item.item_name} 狀態異常"
+                            )
+                            db.session.add(AbnormalCases(
+                                actid=job.actid,
+                                item_id=item.item_id,
+                                equipmentid=job.equipmentid,
+                                measured_value=result.measured_value,
+                                is_processed=False,
+                                abn_msg=abn_msg
+                            ))
                 db.session.commit()
 
         print("\n" + "="*50)
