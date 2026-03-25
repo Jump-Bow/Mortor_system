@@ -172,6 +172,21 @@ https://your-domain.com/api/docs
       - `mterm`: 保養週期
       - `case_status`: 案件狀態 (未結案/已結案)
       - `abnormal_type`: 異常類型 (異常/注意)
+  - `GET /trend/<equipment_id>` - 把表趨勢圖 - 設備歷史量測資料
+    - 參數:
+      - `start_date`: 開始日期 (YYYY-MM-DD)
+      - `end_date`: 結束日期 (YYYY-MM-DD)
+    - 回傳: `dates`、`items`（含 `unit`/`max_v`）、`records`
+  - `GET /comparison` - 同性質設備比較查詢（舊版）
+  - `GET /comparison/items` - 取得去重後檢查項目樹
+    - 回傳: 依 `unit` 分類的 `categories`（馬達-振動/馬達-溫度）
+  - `GET /comparison/equip-trend` - 多設備在同一項目的時序趨勢
+    - 參數:
+      - `item_name`: 項目名稱（必填），例： MIH振動量測
+      - `equip_ids`: 設備 ID 清單（可多筆）
+      - `start_date`: 開始日期
+      - `end_date`: 結束日期
+    - 回傳: `item_name`、`unit`、`max_v`、`dates`、`series`（每台設備的時序資料）
 
 - **系統日誌** (`/api/system-logs/*`)
   - `GET /list` - 操作日誌查詢

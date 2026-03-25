@@ -111,7 +111,12 @@ def aims_progress_detail(actid, **kwargs):
         equipment_list = []
         if job.equipment:
             equip = job.equipment
-            total_items = equip.check_items.count()
+            # KEY FIX: EquitCheckItem 已改為全域 grade/mterm 通用架構，無 equipmentid FK
+            # total_items 應依工單的 grade+mterm 查詢通用項目數量
+            from app.models.Mortor_equipment import EquitCheckItem
+            total_items = EquitCheckItem.query.filter_by(
+                grade=job.grade, mterm=job.mterm
+            ).count()
             completed_items = InspectionResult.query.filter_by(
                 actid=actid, equipmentid=equip.id
             ).count()

@@ -6,234 +6,490 @@
 
 {% block extra_css %}
 <style>
-    .filter-card .card-body {
-        padding: 15px;
-    }
+    /* ── 左側樹狀 ── */
+    .item-tree-wrap { max-height: 680px; overflow-y: auto; }
+    .tree-search-box { padding: 8px; border-bottom: 1px solid #dee2e6; }
 
-    .comparison-chart-container {
-        position: relative;
-        min-height: 350px;
+    .tree-category {
+        background: #2c3e50;
+        color: #ecf0f1;
+        padding: 8px 12px;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        user-select: none;
     }
+    .tree-category i.toggle { transition: transform .2s; margin-right: 6px; font-size: 10px; }
+    .tree-category.collapsed i.toggle { transform: rotate(-90deg); }
+    .tree-category .cat-icon { margin-right: 7px; }
+
+    .tree-leaf {
+        padding: 7px 12px 7px 32px;
+        font-size: 13px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+        transition: background .15s;
+    }
+    .tree-leaf:hover { background: #e9f3ff; }
+    .tree-leaf.active {
+        background: #3498db;
+        color: #fff;
+        font-weight: 600;
+    }
+    .tree-leaf .leaf-icon { margin-right: 7px; font-size: 11px; color: #6c757d; }
+    .tree-leaf.active .leaf-icon { color: #fff; }
+
+    /* ── 右側設備表格 ── */
+    .equip-table-wrap { max-height: 360px; overflow-y: auto; }
+    .equip-table thead th { position: sticky; top: 0; background: #343a40; color: #fff; font-size: 12px; }
+    .equip-table tbody tr:hover { background: #f0f7ff; cursor: pointer; }
+    .equip-table .check-col { width: 36px; text-align: center; }
+
+    /* ── 日期列 ── */
+    .date-bar { background: #343a40; color: #fff; padding: 8px 14px; border-radius: 4px 4px 0 0; }
+
+    /* ── 趨勢圖 ── */
+    .comp-chart-container { position: relative; height: 300px; }
+    .chart-section-header {
+        background: #2c3e50;
+        color: #fff;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    #no-item-hint { text-align: center; padding: 60px 20px; color: #adb5bd; }
+
+    /* 全選按鈕 */
+    .select-all-row { background: #f8f9fa; padding: 4px 8px; font-size: 12px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- 搜尋條件 -->
-<div class="card filter-card">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-filter mr-1"></i>搜尋條件</h3>
-    </div>
-    <div class="card-body">
-        <form id="search-form">
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="form-group">
-                        <label>組織</label>
-                        <select id="filter-org" class="form-control select2" style="width: 100%;">
-                            <option value="">全部組織</option>
-                        </select>
+<div class="row">
+
+    <!-- ===== 左側：檢查項目樹 ===== -->
+    <div class="col-lg-3">
+        <div class="card card-info card-outline h-100">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-list-ul mr-1"></i>檢查項目</h3>
+            </div>
+            <div class="tree-search-box p-2">
+                <div class="input-group input-group-sm">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
                     </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-group">
-                        <label>馬達類別</label>
-                        <select id="filter-group" class="form-control">
-                            <option value="">全部</option>
-                            <option value="A">A 級</option>
-                            <option value="B">B 級</option>
-                            <option value="C">C 級</option>
-                            <option value="D">D 級</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-group">
-                        <label>開始日期</label>
-                        <input type="date" id="filter-start-date" class="form-control">
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-group">
-                        <label>結束日期</label>
-                        <input type="date" id="filter-end-date" class="form-control">
-                    </div>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary btn-block">
-                        <i class="fas fa-search mr-1"></i>查詢比較
-                    </button>
+                    <input type="text" id="tree-search" class="form-control" placeholder="搜尋項目...">
                 </div>
             </div>
-        </form>
-    </div>
-</div>
-
-<!-- 比較圖表 -->
-<div class="card" id="chart-card" style="display: none;">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-chart-bar mr-1"></i>設備比較圖</h3>
-    </div>
-    <div class="card-body">
-        <div class="comparison-chart-container">
-            <canvas id="comparisonChart"></canvas>
+            <div id="item-tree" class="item-tree-wrap p-0">
+                <div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> 載入中...</div>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- 比較列表 -->
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-list mr-1"></i>同性質設備比較列表</h3>
-        <div class="card-tools">
-            <span class="badge badge-info" id="result-count">0 筆</span>
+    <!-- ===== 右側 ===== -->
+    <div class="col-lg-9">
+
+        <!-- 未選提示 -->
+        <div id="no-item-hint">
+            <i class="fas fa-mouse-pointer fa-3x mb-3 d-block"></i>
+            <p>請從左側選擇一個檢查項目，查看該項目的設備比較趨勢圖</p>
+        </div>
+
+        <!-- 選擇日期 -->
+        <div id="right-section" style="display:none;">
+            <div class="card mb-3">
+                <div class="date-bar">
+                    <i class="fas fa-calendar-alt mr-1"></i>
+                    <strong>檢查日期</strong>
+                </div>
+                <div class="card-body py-2">
+                    <div class="form-inline">
+                        <label class="mr-2">開始日期</label>
+                        <div class="input-group input-group-sm mr-4">
+                            <input type="date" id="date-from" class="form-control">
+                            <div class="input-group-append">
+                                <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                            </div>
+                        </div>
+                        <label class="mr-2">結束日期</label>
+                        <div class="input-group input-group-sm mr-3">
+                            <input type="date" id="date-to" class="form-control">
+                            <div class="input-group-append">
+                                <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="setRange(90)">近3月</button>
+                        <button class="btn btn-sm btn-outline-secondary ml-1" onclick="setRange(180)">近6月</button>
+                        <button class="btn btn-sm btn-outline-secondary ml-1" onclick="setRange(365)">近1年</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 設備清單 + 圖示按鈕 -->
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0" id="equip-table-title">
+                        <i class="fas fa-table mr-1"></i><span id="selected-item-name">—</span>
+                    </h3>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary mr-1" onclick="toggleSelectAll()">
+                            <i class="fas fa-check-square mr-1"></i>全選/取消
+                        </button>
+                        <button class="btn btn-sm btn-primary" id="show-chart-btn" onclick="loadComparisonChart()" title="顯示趨勢比較圖">
+                            <i class="fas fa-chart-line mr-1"></i>顯示趨勢圖
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="equip-table-wrap">
+                        <table class="table table-sm table-bordered table-hover equip-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="check-col"><i class="fas fa-check"></i></th>
+                                    <th>組織</th>
+                                    <th>代號</th>
+                                    <th>名稱</th>
+                                    <th>下限值</th>
+                                    <th>上限值</th>
+                                </tr>
+                            </thead>
+                            <tbody id="equip-tbody">
+                                <tr><td colspan="6" class="text-center text-muted">請先選擇檢查項目</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 趨勢比較圖 -->
+            <div class="card" id="chart-card" style="display:none;">
+                <div class="chart-section-header">
+                    <span><i class="fas fa-wave-square mr-1"></i>趨勢圖（檢查項目：<span id="chart-item-name">—</span>）</span>
+                    <button class="btn btn-sm btn-outline-light" data-card-widget="collapse" title="收合">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="comp-chart-container">
+                        <canvas id="comparisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    <div class="card-body p-0">
-        <table class="table table-striped table-hover">
-            <thead>
-                <tr>
-                    <th>設備代號</th>
-                    <th>設備名稱</th>
-                    <th>組織</th>
-                    <th>馬達類別</th>
-                    <th>最近量測日期</th>
-                    <th>平均量測值</th>
-                    <th>異常次數</th>
-                    <th>狀態</th>
-                </tr>
-            </thead>
-            <tbody id="comparison-tbody">
-                <tr>
-                    <td colspan="8" class="text-center text-muted py-4">請輸入搜尋條件後查詢</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    let compChartInstance = null;
+    let compChart = null;
+    let currentItemName = null;
+    let allEquipData = [];  // 設備清單快取
+    let allCategoryData = [];  // 全部類別快取（用於搜尋）
 
+    const CHART_COLORS = [
+        '#8B5CF6','#EC4899','#F97316','#06B6D4','#10B981',
+        '#3B82F6','#EF4444','#F59E0B','#84CC16','#6366F1'
+    ];
+
+    /* ===== 初始化 ===== */
     $(document).ready(function () {
-        $('.select2').select2({ theme: 'bootstrap4' });
-        loadOrganizations();
+        const today = new Date();
+        const past  = new Date(today);
+        past.setDate(today.getDate() - 90);
+        $('#date-to').val(today.toISOString().split('T')[0]);
+        $('#date-from').val(past.toISOString().split('T')[0]);
 
-        $('#search-form').on('submit', function (e) {
-            e.preventDefault();
-            searchComparison();
-        });
+        loadItemTree();
+        $('#tree-search').on('input', filterTree);
     });
 
-    function loadOrganizations() {
+    function setRange(days) {
+        const today = new Date();
+        const past  = new Date(today);
+        past.setDate(today.getDate() - days);
+        $('#date-to').val(today.toISOString().split('T')[0]);
+        $('#date-from').val(past.toISOString().split('T')[0]);
+    }
+
+    /* ===== 載入檢查項目樹 ===== */
+    function loadItemTree() {
         $.ajax({
-            url: '/api/v1/facilities/list',
+            url: '/api/v1/inspection/comparison/items',
             method: 'GET',
-            success: function (response) {
-                if (response.status === 'success' && response.data) {
-                    const select = $('#filter-org');
-                    const orgs = response.data.facilities || response.data;
-                    if (Array.isArray(orgs)) {
-                        orgs.forEach(function (org) {
-                            select.append(`<option value="${org.unitid}">${org.unitname}</option>`);
-                        });
-                    }
+            success: function (res) {
+                if (res.status === 'success') {
+                    allCategoryData = res.data.categories || [];
+                    renderTree(allCategoryData);
                 }
+            },
+            error: function () {
+                $('#item-tree').html('<div class="text-danger text-center py-3">載入失敗</div>');
             }
         });
     }
 
-    function searchComparison() {
-        const params = {
-            org_id: $('#filter-org').val(),
-            group: $('#filter-group').val(),
-            start_date: $('#filter-start-date').val(),
-            end_date: $('#filter-end-date').val()
-        };
-        Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
+    function renderTree(categories) {
+        const tree = $('#item-tree');
+        tree.empty();
 
-        const tbody = $('#comparison-tbody');
-        tbody.html('<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> 查詢中...</td></tr>');
+        const ICONS = { '馬達-振動': 'fas fa-wave-square', '馬達-溫度': 'fas fa-thermometer-half' };
+
+        categories.forEach(function (cat) {
+            const catId = 'cat_' + cat.name.replace(/[^a-zA-Z0-9]/g, '_');
+            const icon  = ICONS[cat.name] || 'fas fa-folder';
+            tree.append(`
+                <div class="tree-category" onclick="toggleCategory('${catId}', this)">
+                    <i class="toggle fas fa-chevron-down"></i>
+                    <i class="${icon} cat-icon"></i>
+                    ${cat.name}
+                </div>
+                <div id="${catId}" class="category-items">
+                </div>
+            `);
+            const catDiv = $(`#${catId}`);
+            cat.items.forEach(function (item) {
+                catDiv.append(`
+                    <div class="tree-leaf" data-item="${item.item_name}"
+                         onclick="selectItem('${item.item_name}', '${item.unit}')">
+                        <i class="fas fa-dot-circle leaf-icon"></i>
+                        ${item.item_name}
+                    </div>
+                `);
+            });
+        });
+    }
+
+    function toggleCategory(catId, el) {
+        $(`#${catId}`).slideToggle(150);
+        $(el).toggleClass('collapsed');
+    }
+
+    function filterTree() {
+        const kw = $('#tree-search').val().trim().toLowerCase();
+        if (!kw) { renderTree(allCategoryData); return; }
+
+        const filtered = allCategoryData.map(cat => ({
+            ...cat,
+            items: cat.items.filter(i => i.item_name.toLowerCase().includes(kw))
+        })).filter(cat => cat.items.length > 0);
+
+        renderTree(filtered);
+    }
+
+    /* ===== 選擇檢查項目 → 載入設備清單 ===== */
+    function selectItem(itemName, unit) {
+        currentItemName = itemName;
+        $('.tree-leaf').removeClass('active');
+        $(`.tree-leaf[data-item="${itemName}"]`).addClass('active');
+
+        $('#no-item-hint').hide();
+        $('#right-section').show();
+        $('#selected-item-name').text(itemName);
+        $('#chart-card').hide();
+
+        // 用現有的設備 API + 前端過濾：取得有此 item 量測記錄的設備
+        // 呼叫 equipment all，再用 comparison API 篩選
+        loadEquipForItem(itemName);
+    }
+
+    function loadEquipForItem(itemName) {
+        const tbody = $('#equip-tbody');
+        tbody.html('<tr><td colspan="6" class="text-center"><i class="fas fa-spinner fa-spin"></i> 載入中...</td></tr>');
+
+        // 先取所有設備，再取 comparison 舊 API 獲取有記錄的設備 id 集合
+        $.ajax({
+            url: '/api/v1/facilities/equipment/all',
+            method: 'GET',
+            success: function (res) {
+                if (res.status === 'success') {
+                    allEquipData = res.data.equipment || [];
+                    renderEquipTable(allEquipData);
+                }
+            },
+            error: function () {
+                tbody.html('<tr><td colspan="6" class="text-danger text-center">載入失敗</td></tr>');
+            }
+        });
+    }
+
+    function renderEquipTable(equipments) {
+        const tbody = $('#equip-tbody');
+        tbody.empty();
+
+        if (!equipments || equipments.length === 0) {
+            tbody.html('<tr><td colspan="6" class="text-muted text-center">無設備資料</td></tr>');
+            return;
+        }
+
+        equipments.forEach(function (e) {
+            tbody.append(`
+                <tr>
+                    <td class="check-col">
+                        <input type="checkbox" class="equip-check" value="${e.id}" checked>
+                    </td>
+                    <td><small>${e.unitname || '-'}</small></td>
+                    <td><small>${e.id}</small></td>
+                    <td>${e.name}</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+            `);
+        });
+    }
+
+    function toggleSelectAll() {
+        const checks = $('.equip-check');
+        const allChecked = checks.length === checks.filter(':checked').length;
+        checks.prop('checked', !allChecked);
+    }
+
+    /* ===== 顯示趨勢比較圖 ===== */
+    function loadComparisonChart() {
+        const selectedIds = $('.equip-check:checked').map(function () {
+            return $(this).val();
+        }).get();
+
+        if (selectedIds.length === 0) {
+            toastr.warning('請至少勾選一台設備');
+            return;
+        }
+
+        const startDate = $('#date-from').val();
+        const endDate   = $('#date-to').val();
+
+        $('#show-chart-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>查詢中...');
+
+        // Build query string（多個 equip_ids）
+        const params = new URLSearchParams();
+        params.append('item_name', currentItemName);
+        selectedIds.forEach(id => params.append('equip_ids', id));
+        if (startDate) params.append('start_date', startDate);
+        if (endDate)   params.append('end_date', endDate);
 
         $.ajax({
-            url: '/api/v1/inspection/comparison',
+            url: '/api/v1/inspection/comparison/equip-trend?' + params.toString(),
             method: 'GET',
-            data: params,
-            success: function (response) {
-                if (response.status === 'success') {
-                    const data = response.data;
-                    const records = data.equipment_list || [];
-
-                    $('#result-count').text(`${records.length} 筆`);
-                    tbody.empty();
-
-                    if (records.length === 0) {
-                        tbody.html('<tr><td colspan="8" class="text-center text-muted py-4">查無資料</td></tr>');
-                        $('#chart-card').hide();
-                        return;
-                    }
-
-                    records.forEach(function (r) {
-                        const statusBadge = r.abnormal_count > 0 ?
-                            '<span class="badge badge-danger">有異常</span>' :
-                            '<span class="badge badge-success">正常</span>';
-                        tbody.append(`<tr>
-                        <td>${r.id}</td>
-                        <td>${r.name}</td>
-                        <td>${r.org_name || '-'}</td>
-                        <td>${r.grade || '-'}</td>
-                        <td>${r.last_inspection_date || '-'}</td>
-                        <td>${r.avg_value != null ? r.avg_value.toFixed(2) : '-'}</td>
-                        <td><span class="badge ${r.abnormal_count > 0 ? 'badge-danger' : 'badge-secondary'}">${r.abnormal_count}</span></td>
-                        <td>${statusBadge}</td>
-                    </tr>`);
-                    });
-
-                    // 繪製比較圖
-                    renderComparisonChart(records);
+            success: function (res) {
+                $('#show-chart-btn').prop('disabled', false).html('<i class="fas fa-chart-line mr-1"></i>顯示趨勢圖');
+                if (res.status === 'success') {
+                    renderCompChart(res.data);
+                } else {
+                    toastr.error(res.message || '查詢失敗');
                 }
             },
             error: function (xhr) {
-                if (xhr.status !== 401) {
-                    tbody.html('<tr><td colspan="8" class="text-center text-danger">查詢失敗</td></tr>');
-                }
+                $('#show-chart-btn').prop('disabled', false).html('<i class="fas fa-chart-line mr-1"></i>顯示趨勢圖');
+                if (xhr.status !== 401) toastr.error('查詢失敗：' + (xhr.responseJSON?.message || '未知錯誤'));
             }
         });
     }
 
-    function renderComparisonChart(records) {
-        const ctx = document.getElementById('comparisonChart');
-        if (!ctx) return;
-        if (compChartInstance) compChartInstance.destroy();
+    function renderCompChart(data) {
+        const dates  = data.dates   || [];
+        const series = data.series  || [];
+        const maxV   = data.max_v;
+        const unit   = data.unit    || '';
 
         $('#chart-card').show();
+        $('#chart-item-name').text(data.item_name);
 
-        compChartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: records.map(r => r.name),
-                datasets: [{
-                    label: '平均量測值',
-                    data: records.map(r => r.avg_value || 0),
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }, {
-                    label: '異常次數',
-                    data: records.map(r => r.abnormal_count || 0),
-                    backgroundColor: 'rgba(255, 99, 132, 0.6)',
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    borderWidth: 1
-                }]
-            },
+        const ctx = document.getElementById('comparisonChart');
+        if (compChart) compChart.destroy();
+
+        const datasets = [];
+
+        // 每台設備一條線
+        series.forEach(function (s, idx) {
+            const color = CHART_COLORS[idx % CHART_COLORS.length];
+            datasets.push({
+                label: `${s.equipment_id} ${s.equipment_name}`,
+                data: dates.map((d, i) => ({ x: d, y: s.values[i] != null ? s.values[i] : null })),
+                borderColor: color,
+                backgroundColor: color + '22',
+                tension: 0.3,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                fill: false,
+                spanGaps: true
+            });
+        });
+
+        // 上限參考線
+        if (maxV != null) {
+            datasets.unshift({
+                label: `上限值${maxV}`,
+                data: dates.map(d => ({ x: d, y: maxV })),
+                borderColor: '#EF4444',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0,
+                fill: false,
+                spanGaps: true
+            });
+        }
+
+        if (datasets.length === 0 || dates.length === 0) {
+            $('#comparisonChart').replaceWith(
+                '<div class="text-center text-muted py-5"><i class="fas fa-chart-line fa-2x mb-2 d-block"></i>選取期間無量測資料</div>'
+            );
+            return;
+        }
+
+        compChart = new Chart(ctx, {
+            type: 'line',
+            data: { datasets: datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } },
-                scales: { y: { beginAtZero: true } }
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        align: 'start',
+                        labels: { boxWidth: 12, padding: 8, font: { size: 12 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const v = ctx.parsed.y;
+                                return v != null
+                                    ? `${ctx.dataset.label}: ${v} ${unit}`
+                                    : `${ctx.dataset.label}: -`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'category',
+                        labels: dates,
+                        ticks: { maxTicksLimit: 10, font: { size: 11 } },
+                        grid: { color: '#e9ecef' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { font: { size: 11 } },
+                        grid: { color: '#e9ecef' },
+                        title: { display: !!unit, text: unit, font: { size: 12 } }
+                    }
+                }
             }
         });
+
+        // 滾動到圖表
+        document.getElementById('chart-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        toastr.success(`已載入 ${series.length} 台設備的比較趨勢圖`);
     }
 </script>
 {% endblock %}
