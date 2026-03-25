@@ -6,96 +6,172 @@
 
 {% block extra_css %}
 <style>
-    .chart-container {
-        position: relative;
-        min-height: 350px;
+    .equip-group-header {
+        background: #f4f6f9;
+        font-weight: 700;
+        font-size: 13px;
+        padding: 6px 12px;
+        color: #495057;
+        border-top: 1px solid #dee2e6;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
     }
-
-    .filter-card .card-body {
-        padding: 15px;
+    .equip-group-header i.toggle-icon {
+        margin-right: 6px;
+        transition: transform 0.2s;
+        font-size: 10px;
+        color: #6c757d;
     }
-
+    .equip-group-header.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+    }
+    .equip-group-header .org-icon {
+        margin-right: 6px;
+        color: #007bff;
+    }
     .equip-select-item {
         cursor: pointer;
-        padding: 8px 12px;
-        border-bottom: 1px solid #eee;
+        padding: 8px 12px 8px 28px;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        transition: background .15s;
     }
-
-    .equip-select-item:hover {
-        background-color: #f0f7ff;
-    }
-
+    .equip-select-item:hover { background: #e9f3ff; }
     .equip-select-item.active {
-        background-color: #007bff;
+        background: #007bff;
         color: #fff;
     }
-
-    .data-table-scroll {
-        max-height: 400px;
-        overflow-y: auto;
+    .equip-select-item.active small { color: #cce0ff !important; }
+    .equip-select-item .equip-icon {
+        margin-right: 7px;
+        color: #6c757d;
+        font-size: 12px;
     }
+    .equip-select-item.active .equip-icon { color: #fff; }
+    .chart-card-header {
+        background: #343a40;
+        color: #fff;
+        padding: 8px 15px;
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 4px 4px 0 0;
+    }
+    .chart-container { position: relative; height: 280px; }
+    .equip-list-wrap { max-height: 560px; overflow-y: auto; }
+    .no-selection-hint {
+        padding: 60px 20px;
+        text-align: center;
+        color: #adb5bd;
+    }
+    #equip-search:focus { border-color: #80bdff; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.15); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row">
-    <!-- 左側: 設備選擇 -->
+    <!-- ===== 左側：選擇設備 ===== -->
     <div class="col-lg-3">
-        <div class="card">
+        <div class="card card-info card-outline">
             <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-cogs mr-1"></i>選擇設備</h3>
+                <h3 class="card-title"><i class="fas fa-sitemap mr-1"></i>選擇設備</h3>
             </div>
-            <div class="card-body p-0">
-                <div class="p-2">
-                    <select id="filter-org" class="form-control select2 mb-2" style="width: 100%;">
-                        <option value="">全部組織</option>
-                    </select>
-                    <input type="text" id="equip-search" class="form-control form-control-sm" placeholder="搜尋設備名稱...">
+            <div class="card-body p-2">
+                <div class="input-group input-group-sm mb-2">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    </div>
+                    <input type="text" id="equip-search" class="form-control" placeholder="搜尋設備名稱...">
                 </div>
-                <div id="equip-list" style="max-height: 500px; overflow-y: auto;">
-                    <div class="text-center text-muted py-3">載入中...</div>
-                </div>
+            </div>
+            <div id="equip-list" class="equip-list-wrap p-0">
+                <div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> 載入中...</div>
             </div>
         </div>
     </div>
 
-    <!-- 右側: 趨勢圖 + 資料表 -->
+    <!-- ===== 右側：趨勢圖 ===== -->
     <div class="col-lg-9">
-        <div class="card" id="trend-card" style="display: none;">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-chart-line mr-1"></i>
-                    <span id="trend-title">趨勢圖</span>
-                </h3>
-                <div class="card-tools">
-                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                        <i class="fas fa-minus"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="trendChart"></canvas>
-                </div>
-            </div>
+        <!-- 未選設備提示 -->
+        <div id="no-selection" class="no-selection-hint">
+            <i class="fas fa-hand-pointer fa-3x mb-3 d-block"></i>
+            <p>請從左側選擇一個設備，查看溫度與振動趨勢圖</p>
         </div>
 
-        <div class="card" id="data-card" style="display: none;">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-table mr-1"></i>量測資料</h3>
+        <!-- 趨勢圖區塊（選擇設備後顯示） -->
+        <div id="trend-section" style="display:none;">
+            <!-- 設備標題 -->
+            <div class="alert alert-info py-2 mb-3" id="equip-title-bar">
+                <i class="fas fa-cog mr-1"></i>
+                <strong id="equip-title-text"></strong>
             </div>
-            <div class="card-body p-0">
-                <div class="data-table-scroll">
-                    <table class="table table-sm table-striped table-hover">
-                        <thead class="thead-light">
+
+            <!-- 日期範圍選擇 -->
+            <div class="card card-outline card-secondary mb-3">
+                <div class="card-body py-2">
+                    <div class="form-inline">
+                        <label class="mr-2 font-weight-bold">日期範圍：</label>
+                        <input type="date" id="date-from" class="form-control form-control-sm mr-2">
+                        <span class="mr-2">~</span>
+                        <input type="date" id="date-to" class="form-control form-control-sm mr-3">
+                        <button class="btn btn-sm btn-primary" onclick="reloadTrend()">
+                            <i class="fas fa-sync-alt mr-1"></i>更新
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary ml-2" onclick="setDateRange(90)">近3個月</button>
+                        <button class="btn btn-sm btn-outline-secondary ml-1" onclick="setDateRange(180)">近6個月</button>
+                        <button class="btn btn-sm btn-outline-secondary ml-1" onclick="setDateRange(365)">近1年</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 振動趨勢圖 -->
+            <div class="card mb-3" id="vibration-card">
+                <div class="chart-card-header">
+                    <i class="fas fa-wave-square mr-1"></i>
+                    趨勢圖（設備：<span class="equip-name-ref"></span> 檢查類別：馬達-振動）
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="vibrationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 溫度趨勢圖 -->
+            <div class="card mb-3" id="temperature-card">
+                <div class="chart-card-header" style="background:#495057;">
+                    <i class="fas fa-thermometer-half mr-1"></i>
+                    趨勢圖（設備：<span class="equip-name-ref"></span> 檢查類別：馬達-溫度）
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 量測明細記錄 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-table mr-1"></i>量測明細記錄</h3>
+                    <div class="card-tools">
+                        <button class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i></button>
+                    </div>
+                </div>
+                <div class="card-body p-0" style="max-height:340px;overflow-y:auto;">
+                    <table class="table table-sm table-striped table-hover mb-0">
+                        <thead class="thead-dark sticky-top">
                             <tr>
+                                <th>日期</th>
                                 <th>檢查項目</th>
                                 <th>量測值</th>
                                 <th>單位</th>
-                                <th>下限值</th>
-                                <th>上限值</th>
-                                <th>異常</th>
-                                <th>量測時間</th>
+                                <th>上限</th>
+                                <th>狀態</th>
                             </tr>
                         </thead>
                         <tbody id="data-tbody"></tbody>
@@ -103,73 +179,57 @@
                 </div>
             </div>
         </div>
-
-        <div id="no-selection" class="text-center py-5">
-            <i class="fas fa-hand-pointer fa-3x text-muted mb-3"></i>
-            <p class="text-muted">請從左側選擇一個設備來查看趨勢圖</p>
-        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    let trendChartInstance = null;
+    let vibrationChart = null;
+    let temperatureChart = null;
+    let currentEquipId = null;
+    let currentEquipName = null;
+    let allEquipments = [];
 
+    /* ===== 顏色配置 ===== */
+    const VIBRATION_COLORS = ['#8B5CF6', '#EC4899', '#F472B6', '#A78BFA', '#C084FC'];
+    const TEMP_COLORS     = ['#6B7280', '#9CA3AF', '#60A5FA'];
+    const LIMIT_COLORS    = ['#EF4444', '#F97316', '#EAB308', '#10B981'];
+
+    /* ===== 初始化 ===== */
     $(document).ready(function () {
-        $('.select2').select2({ theme: 'bootstrap4' });
-        loadOrganizations();
-        loadEquipments();
+        const today = new Date();
+        const past  = new Date(today);
+        past.setDate(today.getDate() - 90);
+        $('#date-to').val(today.toISOString().split('T')[0]);
+        $('#date-from').val(past.toISOString().split('T')[0]);
 
-        $('#filter-org').on('change', loadEquipments);
+        loadEquipments();
         $('#equip-search').on('input', filterEquipments);
     });
 
-    function loadOrganizations() {
-        $.ajax({
-            url: '/api/v1/facilities/list',
-            method: 'GET',
-            success: function (response) {
-                if (response.status === 'success' && response.data) {
-                    const select = $('#filter-org');
-                    const orgs = response.data.facilities || response.data;
-                    if (Array.isArray(orgs)) {
-                        orgs.forEach(function (org) {
-                            select.append(`<option value="${org.unitid}">${org.unitname}</option>`);
-                        });
-
-                        // If org is pre-selected
-                    }
-                }
-            }
-        });
+    function setDateRange(days) {
+        const today = new Date();
+        const past  = new Date(today);
+        past.setDate(today.getDate() - days);
+        $('#date-to').val(today.toISOString().split('T')[0]);
+        $('#date-from').val(past.toISOString().split('T')[0]);
+        if (currentEquipId) reloadTrend();
     }
 
-    function loadEquipments() {
-        const orgId = $('#filter-org').val();
-        const params = orgId ? { org_id: orgId } : {};
+    function reloadTrend() {
+        if (currentEquipId) selectEquipment(currentEquipId, currentEquipName);
+    }
 
+    /* ===== 載入設備清單（依組織分群） ===== */
+    function loadEquipments() {
         $.ajax({
-            url: '/api/v1/facilities',
+            url: '/api/v1/facilities/equipment/all',
             method: 'GET',
-            data: params,
             success: function (response) {
                 if (response.status === 'success') {
-                    const list = $('#equip-list');
-                    const equipments = response.data.facilities || response.data || [];
-                    list.empty();
-
-                    if (equipments.length === 0) {
-                        list.html('<div class="text-center text-muted py-3">無設備資料</div>');
-                        return;
-                    }
-
-                    equipments.forEach(function (e) {
-                        list.append(`<div class="equip-select-item" data-id="${e.id}" data-name="${e.name}" onclick="selectEquipment('${e.id}', '${e.name}')">
-                        <i class="fas fa-cog mr-1 text-muted"></i>${e.name}
-                        <br><small class="text-muted">${e.id}</small>
-                    </div>`);
-                    });
+                    allEquipments = response.data.equipment || [];
+                    renderEquipList(allEquipments);
                 }
             },
             error: function () {
@@ -178,115 +238,260 @@
         });
     }
 
-    function filterEquipments() {
-        const keyword = $('#equip-search').val().toLowerCase();
-        $('.equip-select-item').each(function () {
-            const name = $(this).data('name').toLowerCase();
-            $(this).toggle(name.includes(keyword));
+    function renderEquipList(equipments) {
+        const list = $('#equip-list');
+        list.empty();
+
+        if (!equipments || equipments.length === 0) {
+            list.html('<div class="text-center text-muted py-3">無設備資料</div>');
+            return;
+        }
+
+        // 依 unitname 分群
+        const groups = {};
+        equipments.forEach(function (e) {
+            const key = e.unitname || '未分類';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(e);
+        });
+
+        Object.keys(groups).forEach(function (orgName) {
+            const groupId = 'grp_' + orgName.replace(/\s/g, '_');
+            // 群組標題
+            list.append(`
+                <div class="equip-group-header" onclick="toggleGroup('${groupId}', this)">
+                    <i class="fas fa-chevron-down toggle-icon"></i>
+                    <i class="fas fa-building org-icon"></i>
+                    ${orgName}
+                    <span class="badge badge-secondary ml-auto">${groups[orgName].length}</span>
+                </div>
+                <div id="${groupId}" class="equip-group-items">
+                </div>
+            `);
+            const groupDiv = $(`#${groupId}`);
+            groups[orgName].forEach(function (e) {
+                groupDiv.append(`
+                    <div class="equip-select-item" 
+                         data-id="${e.id}" 
+                         data-name="${e.name}" 
+                         data-unitname="${orgName}"
+                         onclick="selectEquipment('${e.id}', '${e.name}')">
+                        <i class="fas fa-cog equip-icon"></i>
+                        <div>
+                            <div>${e.name}</div>
+                            <small class="text-muted">${e.id}</small>
+                        </div>
+                    </div>
+                `);
+            });
         });
     }
 
+    function toggleGroup(groupId, header) {
+        const group = $('#' + groupId);
+        group.slideToggle(150);
+        $(header).toggleClass('collapsed');
+    }
+
+    function filterEquipments() {
+        const keyword = $('#equip-search').val().toLowerCase().trim();
+        if (!keyword) {
+            renderEquipList(allEquipments);
+            return;
+        }
+        const filtered = allEquipments.filter(e =>
+            e.name.toLowerCase().includes(keyword) || e.id.toLowerCase().includes(keyword)
+        );
+        renderEquipList(filtered);
+    }
+
+    /* ===== 選取設備，載入趨勢資料 ===== */
     function selectEquipment(equipId, equipName) {
-        // 高亮選取
+        currentEquipId   = equipId;
+        currentEquipName = equipName;
+
         $('.equip-select-item').removeClass('active');
         $(`.equip-select-item[data-id="${equipId}"]`).addClass('active');
 
         $('#no-selection').hide();
-        $('#trend-card, #data-card').show();
-        $('#trend-title').text(`${equipName} — 量測趨勢圖`);
+        $('#trend-section').show();
+        $('#equip-title-text').text(equipName);
+        $('.equip-name-ref').text(equipName);
 
-        // 載入趨勢資料
+        const dateFrom = $('#date-from').val();
+        const dateTo   = $('#date-to').val();
+
         $.ajax({
             url: `/api/v1/inspection/trend/${equipId}`,
             method: 'GET',
+            data: { start_date: dateFrom, end_date: dateTo },
             success: function (response) {
                 if (response.status === 'success') {
-                    renderTrendChart(response.data);
-                    renderDataTable(response.data);
+                    const data = response.data;
+                    buildDualCharts(data);
+                    renderDataTable(data.records || []);
+                } else {
+                    toastr.warning('無量測資料');
                 }
             },
             error: function (xhr) {
-                if (xhr.status !== 401) {
-                    toastr.error('載入趨勢資料失敗');
-                }
+                if (xhr.status !== 401) toastr.error('載入趨勢資料失敗');
             }
         });
     }
 
-    function renderTrendChart(data) {
-        const ctx = document.getElementById('trendChart');
-        if (!ctx) return;
-        if (trendChartInstance) trendChartInstance.destroy();
-
-        const items = data.items || [];
+    /* ===== 建立振動 + 溫度雙圖 ===== */
+    function buildDualCharts(data) {
         const dates = data.dates || [];
+        const items = data.items || [];
 
-        const colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#fd7e14', '#20c997'];
+        // 分類
+        const vibItems  = items.filter(i => i.unit === 'mm/s');
+        const tempItems = items.filter(i => i.unit === '℃');
 
-        const datasets = items.map(function (item, idx) {
-            return {
-                label: item.item_name,
-                data: item.values,
-                borderColor: colors[idx % colors.length],
-                backgroundColor: 'transparent',
-                tension: 0.3,
-                pointRadius: 3
-            };
-        });
+        renderChart('vibrationChart', dates, vibItems, VIBRATION_COLORS, 'mm/s');
+        renderChart('temperatureChart', dates, tempItems, TEMP_COLORS, '℃');
+    }
 
-        // 上下限參考線
-        if (data.limits) {
-            if (data.limits.max_v != null) {
-                datasets.push({
-                    label: '上限值',
-                    data: Array(dates.length).fill(data.limits.max_v),
-                    borderColor: '#dc3545',
-                    borderDash: [5, 5],
-                    backgroundColor: 'transparent',
-                    pointRadius: 0
-                });
-            }
-            if (data.limits.min_v != null) {
-                datasets.push({
-                    label: '下限值',
-                    data: Array(dates.length).fill(data.limits.min_v),
-                    borderColor: '#ffc107',
-                    borderDash: [5, 5],
-                    backgroundColor: 'transparent',
-                    pointRadius: 0
-                });
-            }
+    function renderChart(canvasId, dates, items, colors, unitLabel) {
+        const ctx    = document.getElementById(canvasId);
+        if (!ctx) return;
+
+        // 銷毀舊圖
+        if (canvasId === 'vibrationChart' && vibrationChart)    vibrationChart.destroy();
+        if (canvasId === 'temperatureChart' && temperatureChart) temperatureChart.destroy();
+
+        if (items.length === 0) {
+            // 沒有此類資料時顯示空訊息
+            const cardId = (unitLabel === 'mm/s') ? 'vibration-card' : 'temperature-card';
+            $(`#${cardId} .chart-container`).html(
+                `<div class="text-center text-muted py-5">
+                    <i class="fas fa-chart-line fa-2x mb-2 d-block"></i>無${unitLabel === 'mm/s' ? '振動' : '溫度'}量測資料
+                 </div>`
+            );
+            return;
         }
 
-        trendChartInstance = new Chart(ctx, {
+        // ---- 找相同 max_v 的上限線（去重） ----
+        const limitMap = {};
+        items.forEach(function (item) {
+            if (item.max_v != null) {
+                const key = item.max_v;
+                if (!limitMap[key]) limitMap[key] = [];
+                limitMap[key].push(item.item_name);
+            }
+        });
+
+        const datasets = [];
+
+        // 量測 dataset
+        items.forEach(function (item, idx) {
+            const color = colors[idx % colors.length];
+            datasets.push({
+                label: `${item.item_name}（上限值：${item.max_v != null ? item.max_v : '-'}）`,
+                data: dates.map((d, i) => ({
+                    x: d,
+                    y: item.values[i] != null ? item.values[i] : null
+                })),
+                borderColor: color,
+                backgroundColor: color + '22',
+                tension: 0.3,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                fill: false,
+                spanGaps: true
+            });
+        });
+
+        // 上限參考線（每個不同的 max_v 各一條）
+        let limitIdx = 0;
+        Object.keys(limitMap).forEach(function (maxV) {
+            const limitColor = LIMIT_COLORS[limitIdx % LIMIT_COLORS.length];
+            limitIdx++;
+            datasets.push({
+                label: `上限值：${maxV}`,
+                data: dates.map(d => ({ x: d, y: parseFloat(maxV) })),
+                borderColor: limitColor,
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                borderDash: undefined,
+                pointRadius: 0,
+                tension: 0,
+                fill: false,
+                spanGaps: true
+            });
+        });
+
+        const chart = new Chart(ctx, {
             type: 'line',
-            data: { labels: dates, datasets: datasets },
+            data: { datasets: datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } },
-                scales: { y: { beginAtZero: false } }
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        align: 'start',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 8,
+                            font: { size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                const v = ctx.parsed.y;
+                                return v != null ? `${ctx.dataset.label}: ${v} ${unitLabel}` : `${ctx.dataset.label}: -`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'category',
+                        labels: dates,
+                        ticks: { maxTicksLimit: 10, font: { size: 11 } },
+                        grid: { color: '#e9ecef' }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        ticks: { font: { size: 11 } },
+                        grid: { color: '#e9ecef' },
+                        title: { display: true, text: unitLabel, font: { size: 12 } }
+                    }
+                }
             }
         });
+
+        if (canvasId === 'vibrationChart')    vibrationChart    = chart;
+        if (canvasId === 'temperatureChart')  temperatureChart  = chart;
     }
 
-    function renderDataTable(data) {
+    /* ===== 量測明細表 ===== */
+    function renderDataTable(records) {
         const tbody = $('#data-tbody');
         tbody.empty();
 
-        const records = data.records || [];
+        if (!records || records.length === 0) {
+            tbody.append('<tr><td colspan="6" class="text-center text-muted">無量測記錄</td></tr>');
+            return;
+        }
+
         records.forEach(function (r) {
             const isAbn = r.is_out_of_spec > 0;
-            const abnIcon = isAbn ? '<span class="text-danger"><i class="fas fa-exclamation-triangle"></i></span>' : '<span class="text-success"><i class="fas fa-check-circle"></i></span>';
+            const icon  = isAbn
+                ? '<i class="fas fa-exclamation-triangle text-danger"></i>'
+                : '<i class="fas fa-check-circle text-success"></i>';
             tbody.append(`<tr class="${isAbn ? 'table-danger' : ''}">
-            <td>${r.item_name || '-'}</td>
-            <td><strong>${r.measured_value || '-'}</strong></td>
-            <td>${r.unit || '-'}</td>
-            <td>${r.min_v != null ? r.min_v : '-'}</td>
-            <td>${r.max_v != null ? r.max_v : '-'}</td>
-            <td>${abnIcon}</td>
-            <td>${r.act_time || '-'}</td>
-        </tr>`);
+                <td>${r.act_time ? r.act_time.split('T')[0] : '-'}</td>
+                <td>${r.item_name || '-'}</td>
+                <td><strong>${r.measured_value || '-'}</strong></td>
+                <td>${r.unit || '-'}</td>
+                <td>${r.max_v != null ? r.max_v : '-'}</td>
+                <td>${icon}</td>
+            </tr>`);
         });
     }
 </script>

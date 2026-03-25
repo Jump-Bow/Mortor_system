@@ -4,19 +4,180 @@
 {% block page_title %}巡檢行事曆{% endblock %}
 {% block breadcrumb_active %}巡檢行事曆{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+<style>
+    #calendar-container {
+        background: #fff;
+        border-radius: 8px;
+        padding: 15px;
+    }
+    .fc-event {
+        cursor: pointer;
+        border: none !important;
+        padding: 2px 4px;
+    }
+    .fc-daygrid-event-harness { margin-bottom: 2px; }
+    .event-total  { background-color: #17a2b8 !important; }
+    .event-done   { background-color: #28a745 !important; }
+    .event-abnormal { background-color: #dc3545 !important; }
+    .legend-item { display: inline-flex; align-items: center; margin-right: 16px; font-size: 0.85rem; }
+    .legend-dot  { width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">
-            <i class="fas fa-calendar-alt mr-1"></i>巡檢行事曆
-        </h3>
+        <h3 class="card-title"><i class="fas fa-calendar-alt mr-1"></i>巡檢行事曆</h3>
+        <div class="card-tools">
+            <span class="legend-item"><span class="legend-dot" style="background:#17a2b8"></span>工單總數</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#28a745"></span>已完成</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#dc3545"></span>有異常</span>
+        </div>
     </div>
     <div class="card-body">
-        <div class="callout callout-info">
-            <h5><i class="fas fa-info-circle mr-1"></i>功能開發中</h5>
-            <p>巡檢行事曆功能正在開發中，敬請期待。</p>
-            <p>預計將顯示每日/每週/每月的巡檢排程，支援行事曆視圖與拖拉排程功能。</p>
+        <div id="calendar-container">
+            <div id="calendar"></div>
         </div>
     </div>
 </div>
+
+<!-- 日期詳情 Modal -->
+<div class="modal fade" id="dayModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-list mr-1"></i><span id="modal-date-title"></span> 工單列表</h5>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <div id="day-jobs-container">
+                    <div class="text-center"><i class="fas fa-spinner fa-spin"></i> 載入中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script>
+    let calendarInstance = null;
+    let currentCalendarData = {};
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const calEl = document.getElementById('calendar');
+        calendarInstance = new FullCalendar.Calendar(calEl, {
+            initialView: 'dayGridMonth',
+            locale: 'zh-tw',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: ''
+            },
+            height: 'auto',
+            datesSet: function (info) {
+                const year = info.view.currentStart.getFullYear();
+                const month = info.view.currentStart.getMonth() + 1;
+                loadCalendarData(year, month);
+            },
+            eventClick: function (info) {
+                const dateStr = info.event.startStr;
+                showDayDetail(dateStr);
+            }
+        });
+        calendarInstance.render();
+    });
+
+    function loadCalendarData(year, month) {
+        $.ajax({
+            url: '/api/v1/inspection/calendar',
+            method: 'GET',
+            data: { year: year, month: month },
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+            success: function (response) {
+                if (response.status !== 'success') return;
+
+                // 清除舊事件
+                calendarInstance.getEvents().forEach(e => e.remove());
+                currentCalendarData = {};
+
+                response.data.events.forEach(function (ev) {
+                    currentCalendarData[ev.date] = ev;
+
+                    if (ev.total > 0) {
+                        calendarInstance.addEvent({
+                            title: `工單 ${ev.total}`,
+                            start: ev.date,
+                            classNames: ['event-total'],
+                            extendedProps: { type: 'total', date: ev.date }
+                        });
+                    }
+                    if (ev.completed > 0) {
+                        calendarInstance.addEvent({
+                            title: `完成 ${ev.completed}`,
+                            start: ev.date,
+                            classNames: ['event-done'],
+                            extendedProps: { type: 'done', date: ev.date }
+                        });
+                    }
+                    if (ev.abnormal > 0) {
+                        calendarInstance.addEvent({
+                            title: `異常 ${ev.abnormal}`,
+                            start: ev.date,
+                            classNames: ['event-abnormal'],
+                            extendedProps: { type: 'abnormal', date: ev.date }
+                        });
+                    }
+                });
+            },
+            error: function (xhr) {
+                if (xhr.status !== 401) {
+                    toastr.error('載入行事曆資料失敗');
+                }
+            }
+        });
+    }
+
+    function showDayDetail(dateStr) {
+        $('#modal-date-title').text(dateStr);
+        $('#dayModal').modal('show');
+        $('#day-jobs-container').html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 載入中...</div>');
+
+        // 用 inspection/records API 查該日工單
+        const mdate = dateStr.replace(/-/g, '');
+        $.ajax({
+            url: '/api/v1/inspection/records',
+            method: 'GET',
+            data: { start_date: dateStr, end_date: dateStr, page: 1, page_size: 50 },
+            success: function (response) {
+                if (response.status !== 'success' || response.data.records.length === 0) {
+                    $('#day-jobs-container').html('<p class="text-muted text-center">當日無工單</p>');
+                    return;
+                }
+                const records = response.data.records;
+                let html = '<table class="table table-sm table-bordered table-hover">';
+                html += '<thead class="thead-light"><tr><th>工單號碼</th><th>設備名稱</th><th>負責人</th><th>狀態</th><th>完成率</th></tr></thead><tbody>';
+                records.forEach(function (r) {
+                    const statusMap = { '未派工': 'badge-secondary', '執行中': 'badge-info', '已完成': 'badge-success' };
+                    const badge = `<span class="badge ${statusMap[r.status] || 'badge-secondary'}">${r.status}</span>`;
+                    html += `<tr>
+                        <td>${r.act_key || '-'}</td>
+                        <td>${r.equipment_name || '-'}</td>
+                        <td>${r.act_mem || '-'}</td>
+                        <td>${badge}</td>
+                        <td>${r.completion_rate}%</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                $('#day-jobs-container').html(html);
+            },
+            error: function () {
+                $('#day-jobs-container').html('<div class="alert alert-danger">載入失敗</div>');
+            }
+        });
+    }
+</script>
 {% endblock %}
