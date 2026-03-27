@@ -191,7 +191,7 @@ class ProductionConfig(Config):
     # Enhanced Security for Production
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Strict'
+    SESSION_COOKIE_SAMESITE = 'Lax'  # OAuth SSO redirect 需要 Lax；Strict 會導致 Edge SSO 後 session cookie 遺失
     
     # Cache - Redis for Production
     CACHE_TYPE = 'RedisCache'
