@@ -4,414 +4,548 @@
 {% block page_title %}異常追蹤管理{% endblock %}
 {% block breadcrumb_active %}異常追蹤管理{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/jstree/themes/default/style-3.3.15.min.css') }}">
+<style>
+  .org-picker-wrap { position:relative; display:inline-block; width:100%; }
+  .org-tree-drop {
+    position:fixed; z-index:9999; background:#fff;
+    border:1px solid #dee2e6; border-radius:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,.15);
+    padding:8px; min-width:220px; max-height:320px;
+    overflow-y:auto; display:none;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">篩選條件</h3>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">篩選條件</h3></div>
+      <div class="card-body">
+        <form id="filterForm">
+          <div class="row">
+            <div class="col-md-2">
+              <div class="form-group">
+                <label>組織</label>
+                <div class="org-picker-wrap">
+                  <button type="button" id="abn-org-btn" class="btn btn-outline-secondary btn-block text-left">
+                    <i class="fas fa-sitemap mr-1"></i><span id="abn-org-label">全部組織</span>
+                  </button>
+                  <input type="hidden" id="org-filter" name="org_id" value="">
+                </div>
+              </div>
             </div>
-            <div class="card-body">
-                <form id="filterForm">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>組織</label>
-                                <select class="form-control select2" id="org-filter" name="org_id">
-                                    <option value="">全部組織</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>異常類型</label>
-                                <select class="form-control" id="abnormal-type" name="abnormal_type">
-                                    <option value="">全部</option>
-                                    <option value="異常">異常</option>
-                                    <option value="注意">注意</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>案件狀態</label>
-                                <select class="form-control" id="case-status" name="case_status">
-                                    <option value="">全部</option>
-                                    <option value="未結案" selected>未結案</option>
-                                    <option value="已結案">已結案</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>設備</label>
-                                <select class="form-control select2" id="equipment-filter" name="equipment_id">
-                                    <option value="">全部設備</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>馬達類別</label>
-                                <select class="form-control" id="group-filter" name="group">
-                                    <option value="">全部</option>
-                                    <option value="A">A 級</option>
-                                    <option value="B">B 級</option>
-                                    <option value="C">C 級</option>
-                                    <option value="D">D 級</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-1 d-flex align-items-end">
-                            <div class="form-group mb-0 w-100">
-                                <button type="button" class="btn btn-primary btn-block" onclick="searchTracking()">
-                                    <i class="fas fa-search"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>保養週期</label>
-                                <select class="form-control" id="mterm-filter" name="mterm">
-                                    <option value="">全部</option>
-                                    <option value="1M">每月 (1M)</option>
-                                    <option value="3M">每季 (3M)</option>
-                                    <option value="6M">半年 (6M)</option>
-                                    <option value="1Y">每年 (1Y)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>開始日期</label>
-                                <input type="date" class="form-control" id="start-date" name="start_date">
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>結束日期</label>
-                                <input type="date" class="form-control" id="end-date" name="end_date">
-                            </div>
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <div class="form-group mb-0">
-                                <button type="button" class="btn btn-secondary" onclick="resetFilters()">
-                                    <i class="fas fa-redo"></i> 重置
-                                </button>
-                                <button type="button" class="btn btn-success" onclick="exportTracking()">
-                                    <i class="fas fa-file-export"></i> 匯出
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </form>
+            <!-- 組織樹狀浮層 -->
+            <div id="abn-org-drop" class="org-tree-drop">
+              <input class="form-control form-control-sm mb-1" id="abn-org-search" placeholder="搜尋組織...">
+              <div id="abn-org-tree"></div>
             </div>
-        </div>
+            <div class="col-md-2">
+              <div class="form-group">
+                <label>異常類型</label>
+                <select class="form-control" id="abnormal-type" name="abnormal_type">
+                  <option value="">全部</option>
+                  <option value="異常">異常</option>
+                  <option value="注意">注意</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-2">
+              <div class="form-group">
+                <label>案件狀態</label>
+                <select class="form-control" id="case-status" name="case_status">
+                  <option value="" selected>全部</option>
+                  <option value="未結案">未結案</option>
+                  <option value="已結案">已結案</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-2">
+              <div class="form-group">
+                <label>設備</label>
+                <select class="form-control select2" id="equipment-filter" name="equipment_id">
+                  <option value="">全部設備</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-2">
+              <div class="form-group">
+                <label>馬達類別</label>
+                <select class="form-control" id="group-filter" name="group">
+                  <option value="">全部</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+              <div class="form-group mb-0 w-100">
+                <button type="button" class="btn btn-primary btn-block" onclick="searchTracking()">
+                  <i class="fas fa-search"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-2">
+              <div class="form-group">
+                <label>保養週期</label>
+                <select class="form-control" id="mterm-filter" name="mterm">
+                  <option value="">全部</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-2">
+              <div class="form-group">
+                <label>開始日期</label>
+                <input type="date" class="form-control" id="start-date" name="start_date">
+              </div>
+            </div>
+            <div class="col-md-2">
+              <div class="form-group">
+                <label>結束日期</label>
+                <input type="date" class="form-control" id="end-date" name="end_date">
+              </div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <div class="form-group mb-0">
+                <button type="button" class="btn btn-secondary mr-1" onclick="resetFilters()">
+                  <i class="fas fa-redo"></i> 重置
+                </button>
+                <button type="button" class="btn btn-success" onclick="exportTracking()">
+                  <i class="fas fa-file-export"></i> 匯出
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
+  </div>
 </div>
 
 <div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">異常追蹤列表</h3>
-            </div>
-            <div class="card-body">
-                <table id="trackingTable" class="table table-bordered table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>追蹤編號</th>
-                            <th>異常類型</th>
-                            <th>任務編號</th>
-                            <th>設備名稱</th>
-                            <th>檢查項目</th>
-                            <th>檢查結果</th>
-                            <th>異常原因</th>
-                            <th>案件狀態</th>
-                            <th>負責人</th>
-                            <th>發現時間</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">異常工單列表</h3></div>
+      <div class="card-body">
+        <table id="trackingTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th>工單號碼</th>
+              <th>設備名稱</th>
+              <th>馬達類別</th>
+              <th>保養週期</th>
+              <th>工單日期</th>
+              <th>異常項目</th>
+              <th>未結案</th>
+              <th>工單狀態</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- Detail Modal -->
-<div class="modal fade" id="detailModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">異常詳細資訊</h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span>&times;</span>
-                </button>
-            </div>
-            <div class="modal-body" id="detailModalBody">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-success" id="closeCase">結案</button>
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">關閉</button>
-            </div>
+<!-- 工單異常明細 Modal -->
+<div class="modal fade" id="jobDetailModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="jobDetailModalTitle">
+          <i class="fas fa-exclamation-triangle mr-2"></i>異常項目明細
+        </h5>
+        <button type="button" class="close text-white" data-dismiss="modal">
+          <span>&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" id="jobDetailModalBody">
+        <div class="text-center p-4">
+          <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
         </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">關閉</button>
+      </div>
     </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='vendor/jstree/jstree-3.3.15.min.js') }}"></script>
 <script>
-    let trackingTable;
+let trackingTable;
 
-    $(document).ready(function () {
-        // Initialize Select2
-        $('.select2').select2({ theme: 'bootstrap4' });
+$(document).ready(function () {
+  initAbnOrgPicker();
+  loadEquipment();
+  loadOptions();
+  initDataTable();
+  searchTracking();
+  $('#jobDetailModal').on('hidden.bs.modal', function () { searchTracking(); });
+});
 
-        // Set default date range
-        const today = new Date();
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-
-        $('#end-date').val(today.toISOString().split('T')[0]);
-        $('#start-date').val(thirtyDaysAgo.toISOString().split('T')[0]);
-
-        // Load filter options
-        loadOrganizations();
-        loadEquipment();
-
-        // Initialize DataTable
-        initDataTable();
-
-        // Load data
-        searchTracking();
-    });
-
-    function loadOrganizations() {
-        $.ajax({
-            url: '/api/v1/facilities/list',
-            method: 'GET',
-            headers: {
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
-            success: function (response) {
-                if (response.status === 'success' && response.data) {
-                    const select = $('#org-filter');
-                    const orgs = response.data.facilities || response.data;
-                    orgs.forEach(function (org) {
-                        select.append(`<option value="${org.unitid}">${org.unitname}</option>`);
-                    });
-                }
-            }
-        });
+/* ===== 動態載入選項 ===== */
+function loadOptions() {
+  $.ajax({
+    url: '/api/v1/inspection/options', method: 'GET',
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+    success: function (res) {
+      if (res.status === 'success') {
+        const d = res.data;
+        d.grades.forEach(g => $('#group-filter').append(`<option value="${g}">${g} 級</option>`));
+        d.mterms.forEach(m => $('#mterm-filter').append(`<option value="${m}">${m}</option>`));
+      }
     }
+  });
+}
 
-    function loadEquipment() {
-        $.ajax({
-            url: '/api/v1/facilities/equipment/all',
-            method: 'GET',
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-            success: function (response) {
-                if (response.status === 'success') {
-                    const select = $('#equipment-filter');
-                    (response.data.equipment || []).forEach(function (eq) {
-                        select.append(`<option value="${eq.id}">${eq.name}</option>`);
-                    });
-                }
-            }
-        });
+/* ===== 組織樹狀選取器 ===== */
+let abnOrgTreeLoaded = false;
+function initAbnOrgPicker() {
+  const $btn = $('#abn-org-btn'), $drop = $('#abn-org-drop'), $input = $('#org-filter');
+  $btn.on('click', function (e) {
+    e.stopPropagation();
+    if ($drop.is(':visible')) { $drop.hide(); return; }
+    const off = $btn.offset();
+    $drop.css({ top: off.top + $btn.outerHeight() + 4, left: off.left });
+    $drop.show();
+    if (!abnOrgTreeLoaded) loadAbnOrgTree();
+  });
+  $(document).on('click.abn_org', function (e) {
+    if (!$(e.target).closest('#abn-org-drop,#abn-org-btn').length) $drop.hide();
+  });
+  $('#abn-org-search').on('input', function () {
+    if (abnOrgTreeLoaded) $('#abn-org-tree').jstree(true).search($(this).val());
+  });
+}
+function loadAbnOrgTree() {
+  abnOrgTreeLoaded = true;
+  $.ajax({
+    url: '/api/v1/organizations/tree', method: 'GET',
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+    success: function (res) {
+      if (res.status !== 'success') return;
+      const nodes = buildOrgNodes(res.data.organizations || [], '#');
+      nodes.unshift({ id: '__all__', text: '✦ 全部組織', parent: '#', state: { opened: true } });
+      $('#abn-org-tree').jstree({
+        core: { data: nodes, themes: { icons: false } },
+        plugins: ['search'], search: { show_only_matches: true }
+      }).on('select_node.jstree', function (e, data) {
+        if (data.node.id === '__all__') { $('#org-filter').val(''); $('#abn-org-label').text('全部組織'); }
+        else { $('#org-filter').val(data.node.id); $('#abn-org-label').text(data.node.text); }
+        $('#abn-org-drop').hide();
+      });
     }
+  });
+}
+function buildOrgNodes(orgs, parentId) {
+  let r = [];
+  orgs.forEach(function (o) {
+    r.push({ id: o.id, text: o.name, parent: parentId, state: { opened: true } });
+    if (o.children && o.children.length) r = r.concat(buildOrgNodes(o.children, o.id));
+  });
+  return r;
+}
 
-    function initDataTable() {
-        trackingTable = $('#trackingTable').DataTable({
-            processing: true,
-            serverSide: false,
-            data: [],
-            columns: [
-                { data: 'tracking_id' },
-                {
-                    data: 'abnormal_type',
-                    render: function (data) {
-                        // Logic to derive abnormal_type or use from API
-                        // If not from API, we can guess from result_info.is_out_of_spec?
-                        // But we don't have is_out_of_spec in tracking row directly if we use to_dict().
-                        // Wait, updated AbnormalCases.to_dict doesn't return abnormal_type logic yet.
-                        // But user might expect it.
-                        // Let's assume API returns it or default to '異常'
-                        return (data === '注意') ?
-                            '<span class="badge badge-warning">注意</span>' :
-                            '<span class="badge badge-danger">異常</span>';
-                    }
-                },
-                { data: 'result_info.act_key', defaultContent: '-' },
-                { data: 'result_info.equipment_name', defaultContent: '-' },
-                { data: 'result_info.item_name', defaultContent: '-' },
-                { data: 'measured_value', defaultContent: '-' },
-                {
-                    data: 'abn_msg',
-                    defaultContent: '-',
-                    render: function (data) {
-                        if (!data || data === '-') return '-';
-                        return data.length > 30 ? data.substring(0, 30) + '...' : data;
-                    }
-                },
-                {
-                    data: 'case_status',
-                    render: function (data) {
-                        return data === '未結案' ?
-                            '<span class="badge badge-danger">未結案</span>' :
-                            '<span class="badge badge-success">已結案</span>';
-                    }
-                },
-                { data: 'processed_memname', defaultContent: '未指派' },
-                {
-                    data: 'result_info.act_time',
-                    render: function (data) {
-                        return data ? new Date(data).toLocaleString('zh-TW') : '-';
-                    }
-                },
-                {
-                    data: null,
-                    orderable: false,
-                    render: function (data, type, row) {
-                        return `
-                        <button class="btn btn-sm btn-info" onclick="viewDetail('${row.tracking_id}')">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    `;
-                    }
-                }
-            ],
-            language: {
-                url: '/static/datatable_zh-Hant.json'
-            },
-            order: [[0, 'desc']]
+
+
+function loadEquipment() {
+  $.ajax({
+    url: '/api/v1/facilities/equipment/all', method: 'GET',
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+    success: function (res) {
+      if (res.status === 'success') {
+        (res.data.equipment || []).forEach(function (eq) {
+          $('#equipment-filter').append(`<option value="${eq.id}">${eq.name}</option>`);
         });
+      }
     }
+  });
+}
 
-    function searchTracking() {
-        const formData = $('#filterForm').serializeArray();
-        const params = {};
-
-        formData.forEach(function (item) {
-            if (item.value) {
-                params[item.name] = item.value;
-            }
-        });
-
-        params.page = 1;
-        params.page_size = 1000;
-
-        $.ajax({
-            url: '/api/v1/inspection/abnormal/tracking',
-            method: 'GET',
-            data: params,
-            headers: {
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
-            success: function (response) {
-                if (response.status === 'success') {
-                    trackingTable.clear();
-                    trackingTable.rows.add(response.data.tracking_records);
-                    trackingTable.draw();
-
-                    toastr.success(`查詢到 ${response.data.total} 筆紀錄`);
-                }
-            },
-            error: function (xhr) {
-                // 401 由全域 setupAjaxErrorHandler 統一處理（自動刷新 token）
-                if (xhr.status !== 401) {
-                    toastr.error('查詢失敗: ' + (xhr.responseJSON?.message || '未知錯誤'));
-                }
-            }
-        });
-    }
-
-    function resetFilters() {
-        $('#filterForm')[0].reset();
-        $('#case-status').val('未結案');
-        $('#org-filter').val('').trigger('change');
-        $('#equipment-filter').val('').trigger('change');
-        $('#group-filter').val('');
-        $('#mterm-filter').val('');
-
-        const today = new Date();
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-
-        $('#end-date').val(today.toISOString().split('T')[0]);
-        $('#start-date').val(thirtyDaysAgo.toISOString().split('T')[0]);
-
-        searchTracking();
-    }
-
-    function viewDetail(trackingId) {
-        // Find tracking data
-        const trackingData = trackingTable.rows().data().toArray().find(t => t.tracking_id === trackingId);
-
-        if (!trackingData) {
-            toastr.error('找不到資料');
-            return;
+function initDataTable() {
+  trackingTable = $('#trackingTable').DataTable({
+    processing: true,
+    serverSide: false,
+    data: [],
+    columns: [
+      { data: 'act_key' },
+      { data: 'equipment_name', defaultContent: '-' },
+      { data: 'grade', defaultContent: '-' },
+      { data: 'mterm', defaultContent: '-' },
+      { data: 'mdate', defaultContent: '-' },
+      {
+        data: 'total_abnormal_count',
+        className: 'text-center',
+        render: function (d) {
+          return `<span class="badge badge-danger">${d}</span>`;
         }
+      },
+      {
+        data: 'open_count',
+        className: 'text-center',
+        render: function (d) {
+          return d > 0
+            ? `<span class="badge badge-warning">${d}</span>`
+            : `<span class="badge badge-success">0</span>`;
+        }
+      },
+      {
+        data: 'case_status',
+        className: 'text-center',
+        render: function (d) {
+          return d === '已結案'
+            ? '<span class="badge badge-success">已結案</span>'
+            : '<span class="badge badge-danger">未結案</span>';
+        }
+      },
+      {
+        data: null,
+        orderable: false,
+        className: 'text-center',
+        render: function (d, t, row) {
+          const safeKey = (row.act_key || '').replace(/'/g, "\\'");
+          return `<button class="btn btn-sm btn-info"
+                    onclick="viewJobDetail('${row.actid}','${safeKey}')">
+                    <i class="fas fa-eye"></i> 查看項目
+                  </button>
+                  <button class="btn btn-sm btn-outline-success ml-1" title="下載明細"
+                    onclick="exportActReport('${row.actid}')">
+                    <i class="fas fa-file-excel"></i> 匯出
+                  </button>`;
+        }
+      }
+    ],
+    language: { url: '/static/datatable_zh-Hant.json' },
+    order: [[4, 'desc']]
+  });
+}
 
-        const result = trackingData.result_info || {};
+function searchTracking() {
+  const params = {};
+  $('#filterForm').serializeArray().forEach(function (item) {
+    if (item.value) params[item.name] = item.value;
+  });
+  params.page = 1;
+  params.page_size = 500;
 
-        const html = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>異常資訊</h6>
-                <p><strong>追蹤編號:</strong> ${trackingData.tracking_id}</p>
-                <p><strong>異常類型:</strong> <span class="badge badge-${trackingData.abnormal_type === '異常' ? 'danger' : 'warning'}">${trackingData.abnormal_type || '異常'}</span></p>
-                <p><strong>案件狀態:</strong> <span class="badge badge-${trackingData.case_status === '未結案' ? 'danger' : 'success'}">${trackingData.case_status}</span></p>
-                <p><strong>負責人:</strong> ${trackingData.processed_memname || '未指派'}</p>
-                <p><strong>發現時間:</strong> ${result.act_time ? new Date(result.act_time).toLocaleString('zh-TW') : '-'}</p>
-            </div>
-            <div class="col-md-6">
-                <h6>檢查資訊</h6>
-                <p><strong>任務編號:</strong> ${result.act_key || '-'}</p>
-                <p><strong>設備名稱:</strong> ${result.equipment_name || '-'}</p>
-                <p><strong>檢查項目:</strong> ${result.item_name || '-'}</p>
-                <p><strong>檢查結果:</strong> ${result.measured_value || '-'}</p>
-                <p><strong>檢查人員:</strong> ${result.inspector_name || '-'}</p>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-12">
-                <h6>異常原因</h6>
-                <div class="alert alert-warning">
-                    ${trackingData.abn_msg || '無說明'}
-                </div>
-            </div>
-        </div>
-    `;
-
-        $('#detailModalBody').html(html);
-        $('#detailModal').modal('show');
-
-        // Setup close case button
-        $('#closeCase').off('click').on('click', function () {
-            if (trackingData.case_status === '已結案') {
-                toastr.info('此案件已結案');
-                return;
-            }
-            if (confirm('確定要結案嗎？')) {
-                closeCase(trackingId);
-            }
-        });
+  $.ajax({
+    url: '/api/v1/inspection/abnormal/tracking',
+    method: 'GET', data: params,
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+    success: function (res) {
+      if (res.status === 'success') {
+        trackingTable.clear();
+        trackingTable.rows.add(res.data.tracking_records);
+        trackingTable.draw();
+        toastr.success(`查詢到 ${res.data.total} 筆工單`);
+      }
+    },
+    error: function (xhr) {
+      if (xhr.status !== 401)
+        toastr.error('查詢失敗：' + (xhr.responseJSON?.message || '未知錯誤'));
     }
+  });
+}
 
-    function closeCase(trackingId) {
-        toastr.info('結案功能開發中');
-        // TODO: Implement close case API
-    }
+function resetFilters() {
+  $('#filterForm')[0].reset();
+  $('#case-status').val('');
+  $('#org-filter').val('');
+  $('#abn-org-label').text('全部組織');
+  $('#equipment-filter').val('').trigger('change');
+  searchTracking();
+}
 
-    function exportTracking() {
-        toastr.info('匯出功能開發中');
-        // TODO: Implement CSV export
+/* ===== 工單明細 Modal ===== */
+function viewJobDetail(actid, actKey) {
+  $('#jobDetailModalTitle').html(
+    `<i class="fas fa-exclamation-triangle mr-2"></i>工單 ${actKey} — 異常項目明細`
+  );
+  $('#jobDetailModalBody').html(
+    '<div class="text-center p-4"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i><p class="mt-2 text-muted">載入中...</p></div>'
+  );
+  $('#jobDetailModal').modal('show');
+
+  $.ajax({
+    url: `/api/v1/inspection/abnormal/job/${actid}`,
+    method: 'GET',
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+    success: function (res) {
+      if (res.status === 'success') renderJobDetail(res.data);
+      else $('#jobDetailModalBody').html('<div class="alert alert-danger">載入失敗</div>');
+    },
+    error: function () {
+      $('#jobDetailModalBody').html('<div class="alert alert-danger">無法取得資料，請稍後再試</div>');
     }
+  });
+}
+
+function renderJobDetail(data) {
+  const job   = data.job;
+  const items = data.abnormal_items;
+
+  let html = `
+  <div class="row mb-3 p-2 bg-light rounded">
+    <div class="col-md-3"><strong>設備名稱：</strong>${job.equipment_name}</div>
+    <div class="col-md-2"><strong>馬達類別：</strong>${job.grade}</div>
+    <div class="col-md-2"><strong>保養週期：</strong>${job.mterm}</div>
+    <div class="col-md-3"><strong>工單日期：</strong>${job.mdate}</div>
+    <div class="col-md-2"><strong>異常項目：</strong>${items.length} 筆</div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+      <thead class="thead-light">
+        <tr>
+          <th style="width:80px" class="text-center">類型</th>
+          <th>檢查項目</th>
+          <th style="width:90px" class="text-center">量測值</th>
+          <th>異常原因</th>
+          <th style="width:90px" class="text-center">狀態</th>
+          <th style="min-width:200px">處理方式（可編輯）</th>
+          <th style="width:100px" class="text-center">處理人員</th>
+          <th style="width:70px" class="text-center">儲存</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  items.forEach(function (item) {
+    const typeBadge = item.abnormal_type === '注意'
+      ? '<span class="badge badge-warning">注意</span>'
+      : '<span class="badge badge-danger">異常</span>';
+    const statusBadge = item.case_status === '已結案'
+      ? '<span class="badge badge-success">已結案</span>'
+      : '<span class="badge badge-danger">未結案</span>';
+    const safeActid  = item.actid.replace(/'/g, "\\'");
+    const safeItemId = item.item_id.replace(/'/g, "\\'");
+    const solution   = item.abn_solution || '';
+    const handler    = item.processed_memname && item.processed_memname !== '未指派'
+                       ? item.processed_memname : '-';
+    const abn_msg    = item.abn_msg || '-';
+    const valueStr   = item.measured_value
+                       ? `${item.measured_value}${item.unit ? ' ' + item.unit : ''}`
+                       : '-';
+
+    html += `
+      <tr>
+        <td class="text-center">${typeBadge}</td>
+        <td>${item.item_name || item.item_id}</td>
+        <td class="text-center">${valueStr}</td>
+        <td><small class="text-muted">${abn_msg}</small></td>
+        <td class="text-center" id="status-${item.actid}-${item.item_id}">${statusBadge}</td>
+        <td>
+          <textarea class="form-control form-control-sm"
+                    id="sol-${item.actid}-${item.item_id}"
+                    rows="2"
+                    placeholder="請輸入處理方式...">${solution}</textarea>
+        </td>
+        <td class="text-center" id="handler-${item.actid}-${item.item_id}">
+          <small>${handler}</small>
+        </td>
+        <td class="text-center">
+          <button class="btn btn-sm btn-primary"
+                  title="儲存處理方式"
+                  onclick="saveItemSolution('${safeActid}','${safeItemId}',this)">
+            <i class="fas fa-save"></i>
+          </button>
+        </td>
+      </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  $('#jobDetailModalBody').html(html);
+}
+
+function saveItemSolution(actid, item_id, btn) {
+  const solVal = $(`#sol-${actid}-${item_id}`).val().trim();
+  const $btn   = $(btn);
+  $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+
+  $.ajax({
+    url: `/api/v1/inspection/abnormal/${actid}/${item_id}`,
+    method: 'PUT',
+    contentType: 'application/json',
+    data: JSON.stringify({ abn_solution: solVal }),
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+    success: function (res) {
+      if (res.status === 'success') {
+        const d         = res.data;
+        const isClosed  = solVal.length > 0;
+        const newBadge  = isClosed
+          ? '<span class="badge badge-success">已結案</span>'
+          : '<span class="badge badge-danger">未結案</span>';
+        $(`#status-${actid}-${item_id}`).html(newBadge);
+
+        const name = d.processed_memname || d.processed_memid || '-';
+        $(`#handler-${actid}-${item_id}`).html(`<small>${name}</small>`);
+
+        toastr.success('處理方式已儲存');
+      } else {
+        toastr.error('儲存失敗：' + (res.message || '未知錯誤'));
+      }
+    },
+    error: function (xhr) {
+      if (xhr.status !== 401)
+        toastr.error('儲存失敗：' + (xhr.responseJSON?.message || '未知錯誤'));
+    },
+    complete: function () {
+      $btn.prop('disabled', false).html('<i class="fas fa-save"></i>');
+    }
+  });
+}
+
+function exportTracking() {
+  toastr.info('匯出功能開發中');
+}
+/* ===== 單張工單報表下載 ===== */
+function exportActReport(actid) {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    toastr.error('憑證無效或已過期，請重新登入');
+    return;
+  }
+  
+  toastr.info('準備下載中...');
+  
+  fetch(`/api/v1/inspection/export/actid/${actid}`, {
+    method: 'GET',
+    headers: { 'Authorization': 'Bearer ' + token }
+  })
+  .then(resp => {
+    if (!resp.ok) {
+      return resp.json().then(err => { throw new Error(err.message || '下載失敗'); });
+    }
+    // 取得檔名
+    const disposition = resp.headers.get('Content-Disposition');
+    let filename = 'report.csv';
+    if (disposition && disposition.indexOf('attachment') !== -1) {
+      const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+      if (matches != null && matches[1]) {
+        filename = matches[1].replace(/['"]/g, '');
+      }
+    }
+    return resp.blob().then(blob => ({ blob, filename }));
+  })
+  .then(({ blob, filename }) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    $(a).remove();
+    toastr.success('下載完成');
+  })
+  .catch(err => {
+    console.error('Export error:', err);
+    toastr.error(err.message || '報表下載失敗，請聯絡系統管理員');
+  });
+}
 </script>
 {% endblock %}
