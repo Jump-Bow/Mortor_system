@@ -89,8 +89,35 @@ steps:
           --region ${_LOCATION} \
           --wait
 
-# ==============================================================================
-# 設定與環境變數
+  # ==============================================================================
+  # 步驟 5: 部署 Oracle AIMS 同步 Job (motor-oracle-sync)
+  # 執行 scripts/sync_oracle_data.py，以 Thick Mode 直連 AIMS Oracle 11.2g
+  # ==============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Oracle Sync Job'
+    waitFor:
+      - 'Push image'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== Deploying Oracle Sync Cloud Run Job: motor-oracle-sync ==="
+        gcloud run jobs deploy motor-oracle-sync \
+          --image ${_IMAGE_PATH}:${SHORT_SHA} \
+          --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
+          --project "${_DEPLOY_PROJECT_ID}" \
+          --region ${_LOCATION} \
+          --command "python" \
+          --args "scripts/sync_oracle_data.py" \
+          --network "${_VPC_NETWORK}" \
+          --subnet "${_VPC_SUBNET}" \
+          --vpc-egress "all-traffic" \
+          --set-env-vars "FLASK_ENV=production" \
+          --set-secrets "ORA_DB_USER=ORA_DB_USER:latest,ORA_DB_PASS=ORA_DB_PASS:latest,ORA_DB_SERVER=ORA_DB_SERVER:latest,ORA_DB_PORT=ORA_DB_PORT:latest,ORA_DB_SERVICE=ORA_DB_SERVICE:latest,PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest" \
+          --max-retries 1
+        echo "=== Oracle Sync Job 部署完成（手動觸發執行請至 GCP Console）==="
+
+
 # ==============================================================================
 timeout: 7200s
 
