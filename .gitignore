@@ -25,3 +25,13 @@ ENV/
 .ipynb_checkpoints/
 my_docker_logs.txt
 docker_logs_tmp.txt
+
+# Oracle Instant Client 二進位檔案（請勿 commit，體積過大且含 OS 相依 .so 檔）
+instantclient/
+instantclient_*/
+
+# 暫時的分析/研究用暫存檔
+scripts/sync_oracle_data_old.py
+scripts/requirements_old.txt
+scripts/Dockerfile_old.txt
+scripts/cloudbuild_old.txt

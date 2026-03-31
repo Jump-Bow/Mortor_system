@@ -14,6 +14,10 @@ psycopg2-binary==2.9.9
 SQLAlchemy==2.0.23
 redis==5.0.1
 
+# Oracle Integration (AIMS - Thick Mode, Oracle 11.2g compatible)
+oracledb==2.1.2
+pandas==2.1.4
+
 # Authentication & Security
 PyJWT==2.8.0
 bcrypt==4.1.2
@@ -36,7 +40,7 @@ Pillow==10.1.0
 python-dateutil==2.8.2
 pytz==2023.3
 
-# HTTP Requests (for AIMS integration)
+# HTTP Requests
 requests==2.31.0
 
 # Testing
