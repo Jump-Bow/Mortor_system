@@ -11,14 +11,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     FLASK_APP=run.py \
     PORT=5000
 
-# Install system dependencies (PostgreSQL client libraries)
+# Install system dependencies
+# - libaio1 : Oracle Instant Client 厚模式必要（libclntsh.so 依賴）
+# - unzip   : 解壓縮 Oracle Instant Client zip
+# - curl    : HEALTHCHECK 使用
+# - libpq-dev: psycopg2-binary 已預先編譯，不需要此項，故移除
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libpq-dev \
-    curl \
+    libaio1 \
     unzip \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
 
 # ─── Oracle Instant Client 19.x (相容 Oracle 11.2g+) ──────────────────────────────
 # 將本地 33MB 的 zip 檔複製進 Docker 內解壓縮（避免 VPC 防火牆擋住外部下載）
