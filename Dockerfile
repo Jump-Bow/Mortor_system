@@ -17,7 +17,16 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libpq-dev \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# ─── Oracle Instant Client 19.x (相容 Oracle 11.2g+) ──────────────────────────────
+# 將本地 33MB 的 zip 檔複製進 Docker 內解壓縮（避免 VPC 防火牆擋住外部下載）
+# 前提：請務必將 instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip 放在專案根目錄
+COPY ./instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip /tmp/instantclient.zip
+RUN unzip -q /tmp/instantclient.zip -d /opt/oracle \
+    && mv /opt/oracle/instantclient_19_24 /opt/oracle/instantclient \
+    && rm /tmp/instantclient.zip
 
 # Copy requirements file
 COPY requirements.txt .
