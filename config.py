@@ -87,7 +87,7 @@ class Config:
     ]
     
     # API Rate Limiting
-    RATELIMIT_ENABLED = True
+    RATELIMIT_ENABLED = os.getenv('RATELIMIT_ENABLED', 'true').lower() == 'true'
     RATELIMIT_DEFAULT = "100 per hour"
     
     # Logging

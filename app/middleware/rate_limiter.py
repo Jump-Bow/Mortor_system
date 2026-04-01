@@ -20,6 +20,10 @@ class RateLimiter:
     @classmethod
     def _get_redis(cls):
         """取得 Redis 連線（懶載入，失敗時不快取避免永遠無法重試）"""
+        # 若功能已停用，直接返回，不嘗試連線也不印警告
+        if not current_app.config.get('RATELIMIT_ENABLED', True):
+            return None
+
         if cls._redis_client is not None:
             try:
                 cls._redis_client.ping()
