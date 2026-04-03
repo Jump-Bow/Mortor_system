@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>工單量測資料 - {{ vi_no }} - FEM 設備保養系統</title>
+
+    <!-- Google Font: Source Sans Pro -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fonts/source-sans-pro/source-sans-pro.css') }}">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+    <!-- AdminLTE -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/adminlte/adminlte-3.2.0.min.css') }}">
+    <!-- DataTables -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/datatables/dataTables.bootstrap4-1.13.6.min.css') }}">
+    
+    <style>
+        body {
+            background-color: #f4f6f9;
+            font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .public-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .header-title {
+            margin: 0;
+            color: #343a40;
+            font-weight: 600;
+        }
+        .job-card-info dt {
+            color: #6c757d;
+            font-weight: normal;
+        }
+        .job-card-info dd {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .status-badge {
+            font-size: 0.9em;
+            padding: 5px 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="public-wrapper">
+        <div class="header-section">
+            <h2 class="header-title">
+                <i class="fas fa-file-alt text-primary"></i> 工單量測詳細報告
+            </h2>
+            <div class="text-muted">
+                <strong>系統產生時間:</strong> <span id="generate-time"></span>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card card-outline card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">工單基本資訊</h3>
+                    </div>
+                    <div class="card-body job-card-info">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <dl class="row">
+                                    <dt class="col-sm-4">工單號碼(AIMS):</dt>
+                                    <dd class="col-sm-8">{{ job.act_key or '-' }}</dd>
+
+                                    <dt class="col-sm-4">設備名稱:</dt>
+                                    <dd class="col-sm-8">{{ job.equipment_name or '-' }}</dd>
+
+                                    <dt class="col-sm-4">指派員 (負責人):</dt>
+                                    <dd class="col-sm-8">{{ job.act_mem_name or job.act_mem or '-' }}</dd>
+                                    
+                                    <dt class="col-sm-4">工單內容:</dt>
+                                    <dd class="col-sm-8">{{ job.act_desc or '-' }}</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-6">
+                                <dl class="row">
+                                    <dt class="col-sm-4">進度狀態:</dt>
+                                    <dd class="col-sm-8">
+                                        {% if job.status == '已完成' %}
+                                        <span class="badge badge-success status-badge">已完成</span>
+                                        {% elif job.status == '執行中' %}
+                                        <span class="badge badge-info status-badge">執行中</span>
+                                        {% else %}
+                                        <span class="badge badge-secondary status-badge">{{ job.status or '未派工' }}</span>
+                                        {% endif %}
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">完成度:</dt>
+                                    <dd class="col-sm-8">
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress progress-sm w-100 mr-2" style="height: 10px;">
+                                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ job.completion_rate }}%"></div>
+                                            </div>
+                                            <span class="text-sm font-weight-bold">{{ job.completion_rate }}%</span>
+                                        </div>
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">馬達類別:</dt>
+                                    <dd class="col-sm-8">{{ job.grade or '-' }} 級</dd>
+                                    
+                                    <dt class="col-sm-4">保養週期:</dt>
+                                    <dd class="col-sm-8">{{ job.mterm or '-' }}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">檢驗設備量測資料 ({{ job.results|length if job.results else 0 }} 項)</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped" id="resultsTable">
+                                <thead>
+                                    <tr>
+                                        <th>檢查項目 (ID)</th>
+                                        <th>量測值</th>
+                                        <th>狀態</th>
+                                        <th>檢驗時間</th>
+                                        <th>檢驗員 (ID)</th>
+                                        <th>異常內容與備註</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if job.results %}
+                                        {% for result in job.results %}
+                                        <tr class="{% if result.is_out_of_spec != 0 and result.is_out_of_spec != 1 and result.is_out_of_spec is not none %}table-danger{% endif %}">
+                                            <td>{{ result.item_name or result.item_id }}</td>
+                                            <td class="font-weight-bold">{{ result.measured_value or '-' }}</td>
+                                            <td>
+                                                {% if result.is_out_of_spec == 1 %}
+                                                <span class="badge badge-success">正常</span>
+                                                {% elif result.is_out_of_spec in [2, 3] %}
+                                                <span class="badge badge-danger">異常</span>
+                                                {% else %}
+                                                <span class="badge badge-secondary">未填/其他</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ result.act_time or '-' }}</td>
+                                            <td>{{ result.act_mem_id or '-' }}</td>
+                                            <td>
+                                                {% if result.abn_msg %}
+                                                    <div class="text-danger"><i class="fas fa-exclamation-triangle"></i> {{ result.abn_msg }}</div>
+                                                    {% if result.abn_solution %}
+                                                    <div class="text-muted small"><strong>處理:</strong> {{ result.abn_solution }}</div>
+                                                    {% endif %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">目前尚無量測結果紀錄</td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center text-muted mt-4 mb-4">
+            <small>&copy; FEM 設備保養管理系統</small>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery-3.6.0.min.js') }}"></script>
+    <!-- Bootstrap 4 -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-4.6.0.bundle.min.js') }}"></script>
+    <!-- DataTables -->
+    <script src="{{ url_for('static', filename='vendor/datatables/jquery.dataTables-1.13.6.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/datatables/dataTables.bootstrap4-1.13.6.min.js') }}"></script>
+
+    <script>
+        $(document).ready(function() {
+            // 設定當下時間
+            const now = new Date();
+            $('#generate-time').text(now.toLocaleString('zh-TW'));
+
+            // 初始化 DataTables
+            $('#resultsTable').DataTable({
+                language: {
+                    url: "https://cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json"
+                },
+                paging: false,       // 因為一個工單通常項目不會太多，可直接列出
+                info: false,
+                searching: true,
+                order: []            // 不預設排序，保留伺服器拋出來的順序
+            });
+        });
+    </script>
+</body>
+</html>

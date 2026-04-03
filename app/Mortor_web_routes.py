@@ -233,6 +233,29 @@ def system_logs():
     return render_template('system/Mortor_logs.html')
 
 
+@web_bp.route('/public/inspection-report')
+def public_inspection_report():
+    """公開工單詳細報告 (AIMS 用，免驗證)"""
+    from app.models.Mortor_inspection import TJob
+    
+    vi_no = request.args.get('VI_NO')
+    if not vi_no:
+        return render_template('errors/Mortor_404.html', message="缺少工單號碼 (VI_NO) 參數"), 400
+        
+    job = TJob.query.filter(TJob.act_key == vi_no).first()
+    if not job:
+        # AIMS 也有可能是傳入 actid，所以也可以用 or 來做 fallback
+        job = TJob.query.filter(TJob.actid == vi_no).first()
+        
+    if not job:
+        return render_template('errors/Mortor_404.html', message=f"找不到工單 {vi_no} 的資料"), 404
+        
+    # to_dict 會計算完成率、加載設備名稱等資訊
+    job_data = job.to_dict(include_results=True)
+    
+    return render_template('inspection/Mortor_public_report.html', job=job_data, vi_no=vi_no)
+
+
 # Error handlers
 @web_bp.errorhandler(404)
 def not_found_error(error):

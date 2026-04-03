@@ -54,19 +54,20 @@ erDiagram
 
     inspection_result {
         VARCHAR(48) actid PK_FK "工單ID"
+        VARCHAR(48) equipmentid PK_FK "設備編號(複合PK)"
         VARCHAR(48) item_id PK_FK "項目ID"
-        VARCHAR(48) equipmentid FK "設備編號"
         VARCHAR(48) measured_value "量測值"
         VARCHAR(30) act_mem_id FK "負責人ID"
         DATETIME2 act_time "量測時間"
         VARCHAR(2000) result_photo "照片位置"
         BIT is_out_of_spec "是否異常(0,1,2,3)"
+        BIT is_synced "是否已同步(0,1)"
     }
 
     AbnormalCases {
         VARCHAR(48) actid PK_FK "工單ID"
+        VARCHAR(48) equipmentid PK_FK "設備編號(複合PK)"
         VARCHAR(48) item_id PK_FK "項目ID"
-        VARCHAR(48) equipmentid FK "設備編號"
         VARCHAR(48) measured_value "量測值"
         BIT is_processed "是否處理"
         VARCHAR(2000) abn_msg "異常內容"
@@ -143,7 +144,7 @@ erDiagram
 *   **hr_account → inspection_result**: 每個檢查結果記錄了實際檢查人員（`act_mem_id` 關聯）。
 
 ### 4. 異常追蹤 (Abnormal Tracking)
-*   **inspection_result → AbnormalCases**: 異常追蹤記錄關聯到特定的巡檢結果（複合鍵 `actid` + `item_id`）。
+*   **inspection_result → AbnormalCases**: 異常追蹤記錄關聯到特定的巡檢結果（複合鍵 `actid` + `equipmentid` + `item_id`）。
 *   **hr_account → AbnormalCases**: 異常由特定的處理人員處理（`processed_memid` 關聯）。
 
 ### 5. 系統日誌 (Logs)
