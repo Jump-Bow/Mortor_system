@@ -108,14 +108,23 @@ def upload_results(**kwargs):
                 if success:
                     result_photo = saved_path
             
-            # Check if result already exists (update or create)
+            # P0-2：用 savepoint 讓每筆獨立事務，避免單筆失敗 rollback 沙染前面已成功的資料
+            # 先查詢 DB 是否已有此紀錄（savepoint 前查詢，避免 dirty read）
             result = InspectionResult.query.filter_by(
                 actid=actid,
+                equipmentid=task.equipmentid,  # P1-A: 補 equipmentid 以對齊三欄複合主鍵
                 item_id=result_data['item_id']
             ).first()
-            
+
+            db.session.begin_nested()  # savepoint
+
+            # P0-3：LWW — 若 DB 已有相同或較新的紀錄，視為安全重試，跳過不覆蓋
             if result:
-                # Update
+                if result.act_time and acttime and result.act_time >= acttime:
+                    db.session.rollback()  # release savepoint
+                    uploaded_count += 1   # 視為成功（重試）
+                    continue
+                # 更新（新量測時間 > DB 時間，合法覆蓋）
                 result.measured_value = result_data['measured_value']
                 result.is_out_of_spec = result_data.get('is_out_of_spec', 0)
                 result.act_time = acttime
@@ -141,6 +150,7 @@ def upload_results(**kwargs):
             if result.is_out_of_spec and result.is_out_of_spec >= 2:
                 tracking = AbnormalCases.query.filter_by(
                     actid=actid,
+                    equipmentid=task.equipmentid,  # P1-B: 補 equipmentid 以對齊三欄複合主鍵
                     item_id=result_data['item_id']
                 ).first()
                 
@@ -151,30 +161,28 @@ def upload_results(**kwargs):
                         item_id=result_data['item_id'],
                         measured_value=result_data['measured_value'],
                         is_processed=False,
-                        abn_msg='',
+                        # P2-10：從 App payload 取異常原因，不再永遠空字串
+                        abn_msg=result_data.get('abn_msg', '') or '',
                         abn_solution='',
                     )
                     db.session.add(tracking)
             
+            db.session.commit()  # commit savepoint
             uploaded_count += 1
             
         except Exception as e:
             current_app.logger.error(f'Error uploading result {idx}: {str(e)}')
             errors.append({'index': idx, 'reason': str(e)})
             failed_count += 1
-            db.session.rollback()
+            db.session.rollback()  # rollback savepoint only
             continue
     
-    # Commit all changes
+    # P0-2：各筆已獨立 commit，最後一次 commit 確保 session 干淨
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'Error committing results: {str(e)}')
-        return jsonify({
-            'status': 'error',
-            'message': f'資料儲存失敗: {str(e)}'
-        }), 500
+        current_app.logger.error(f'Final commit error: {str(e)}')
     
     current_app.logger.info(
         f'User {current_user.id} uploaded {uploaded_count} results for task {actid}'
