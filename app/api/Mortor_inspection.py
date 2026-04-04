@@ -523,7 +523,7 @@ def get_job_abnormal_items(actid, **kwargs):
                 if result.is_out_of_spec == 2:
                     item_dict['abnormal_type'] = '異常'
                 elif result.is_out_of_spec >= 3:
-                    item_dict['abnormal_type'] = '注意'
+                    item_dict['abnormal_type'] = '停機'  # is_out_of_spec=3 語意為停機，對齊 APP 端定義
                 else:
                     item_dict['abnormal_type'] = '異常'
             else:
