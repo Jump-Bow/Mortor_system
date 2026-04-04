@@ -21,20 +21,10 @@ tasks_bp = Blueprint('tasks', __name__)
 @log_request
 def download_tasks(**kwargs):
     """
-    下載指派給使用者的巡檢任務
+    下載巡檢任務清單
+    注意：目前未啟用人員派工功能，回傳所有工單供現場人員使用
+    待 Admin 派工功能上線後，再依 act_mem_id 篩選指派工單
     """
-    current_user = kwargs.get('current_user')
-    
-    # Get user_id from query parameter or use current user
-    user_id = request.args.get('user_id', current_user.id)
-    
-    # Verify permission
-    if user_id != current_user.id:
-        return jsonify({
-            'status': 'error',
-            'message': '權限不足'
-        }), 403
-    
     # Get date filter
     date_str = request.args.get('date')
     if date_str:
@@ -46,17 +36,17 @@ def download_tasks(**kwargs):
         filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     else:
         filter_date = date.today()
-    
-    # Query tasks (Updated field actmemid -> act_mem_id)
-    tasks_query = TJob.query.filter_by(act_mem_id=user_id)
-    
+
+    # Query tasks — 全部工單（未實作派工故不篩人員）
+    tasks_query = TJob.query
+
     if date_str:
         # P2-9：mdate 是 VARCHAR(8)，統一轉為 YYYYMMDD 字串比較
         filter_date_str = filter_date.strftime('%Y%m%d')
         tasks_query = tasks_query.filter(TJob.mdate >= filter_date_str)
-    
+
     tasks = tasks_query.all()
-    
+
     # Build response with full task details
     tasks_data = []
     for task in tasks:
