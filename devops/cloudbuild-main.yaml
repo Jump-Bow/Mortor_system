@@ -110,7 +110,7 @@ substitutions:
   # 自動組合完整的網路與子網路路徑
   _VPC_NETWORK: 'projects/${_HOST_PROJECT_ID}/global/networks/${_SHARED_VPC_NAME}'
   _VPC_SUBNET: 'projects/${_HOST_PROJECT_ID}/regions/${_LOCATION}/subnetworks/${_SHARED_SUBNET_NAME}'
-  # --- 【映像檔來源設定 (維持不變)】 ---
+  # --- 【映像檔來源設定 (由於先前權限與 IT 設定，退回原 cmc-devops 位置)】 ---
   _IMAGE_PATH: asia-east1-docker.pkg.dev/cmc-devops/pd-repo/ai-motor-server-image
 
 # 已移除 availableSecrets 區塊
