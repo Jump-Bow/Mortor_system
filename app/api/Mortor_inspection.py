@@ -275,11 +275,13 @@ def get_inspection_record_details(task_id, **kwargs):
             item_dict = item.to_dict()
             
             if result:
+                # P1-8：取真實姓名，不再回傳 ID
+                inspector = HrAccount.query.get(result.act_mem_id) if result.act_mem_id else None
                 item_dict['result'] = {
                     'measured_value': result.measured_value,
                     'is_out_of_spec': result.is_out_of_spec,
                     'act_time': result.act_time.isoformat() if result.act_time else None,
-                    'inspector_name': result.act_mem_id, # Simplified, or fetch user name
+                    'inspector_name': inspector.name if inspector else result.act_mem_id,
                     'result_photo': result.result_photo
                 }
             else:
@@ -908,7 +910,10 @@ def get_inspection_calendar(**kwargs):
             total_items = EquitCheckItem.query.filter_by(
                 grade=job.grade, mterm=job.mterm
             ).count()
-            completed_items = job.results.count()
+            # P1-5：完成數不計入 is_out_of_spec=0（未填寫的空白紀錄）
+            completed_items = job.results.filter(
+                InspectionResult.is_out_of_spec != 0
+            ).count()
             if total_items > 0 and completed_items >= total_items:
                 daily_stats[d_str]['completed'] += 1
 
