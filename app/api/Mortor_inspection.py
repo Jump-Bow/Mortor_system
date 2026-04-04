@@ -412,14 +412,21 @@ def query_abnormal_tracking(**kwargs):
             job_query = job_query.filter(TJob.mdate <= end_date_str.replace('-', ''))
 
         # 異常類型篩選：exists 子查詢，不產生重複列
+        # abnormal_type: '異常'(is_out_of_spec=2) / '停機'(is_out_of_spec=3)
         if abnormal_type:
             from sqlalchemy import exists as sa_exists
-            spec_val = 2 if abnormal_type == '異常' else 3
-            abnormal_type_sq = sa_exists().where(
-                (InspectionResult.actid == TJob.actid) &
-                (InspectionResult.is_out_of_spec == spec_val)
-            )
-            job_query = job_query.filter(abnormal_type_sq)
+            if abnormal_type == '異常':
+                spec_val = 2
+            elif abnormal_type == '停機':
+                spec_val = 3
+            else:
+                spec_val = None
+            if spec_val is not None:
+                abnormal_type_sq = sa_exists().where(
+                    (InspectionResult.actid == TJob.actid) &
+                    (InspectionResult.is_out_of_spec == spec_val)
+                )
+                job_query = job_query.filter(abnormal_type_sq)
 
         jobs = job_query.order_by(TJob.mdate.desc()).all()
 
