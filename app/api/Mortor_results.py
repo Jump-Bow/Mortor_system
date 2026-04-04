@@ -263,13 +263,15 @@ def upload_photo(**kwargs):
     
     actid = request.form['actid']
     itemid = request.form['itemid']
+    equipmentid = request.form.get('equipmentid')  # P2-D: 証別複合主鍵用
     file = request.files['file']
     
     # Verify result exists
-    result = InspectionResult.query.filter_by(
-        actid=actid,
-        item_id=itemid
-    ).first()
+    # P2-D: 補上 equipmentid 以對齊三欄複合主鍵 (actid, equipmentid, item_id)
+    query_filter = {'actid': actid, 'item_id': itemid}
+    if equipmentid:
+        query_filter['equipmentid'] = equipmentid
+    result = InspectionResult.query.filter_by(**query_filter).first()
     
     if not result:
         return jsonify({
