@@ -51,17 +51,28 @@ class AbnormalCases(db.Model):
         # 'tracking_id': Use actid + item_id hash or concatenation?
         tracking_id = f"{self.actid}_{self.item_id}"
         
+        # 結案狀態以 abn_solution 為唯一依據：有填寫 = 已結案，空白/None = 未結案
+        has_solution = bool(self.abn_solution and self.abn_solution.strip())
+
+        # 處理人員：優先顯示姓名，其次 ID，都沒有則顯示「未指派」
+        if self.responsible_user and self.responsible_user.name:
+            handler_name = self.responsible_user.name
+        elif self.processed_memid:
+            handler_name = self.processed_memid
+        else:
+            handler_name = '未指派'
+
         return {
             'actid': self.actid,
             'equipmentid': self.equipmentid,
             'item_id': self.item_id,
             'measured_value': self.measured_value,
-            'is_processed': self.is_processed,
-            'case_status': '已結案' if self.is_processed else '未結案',
+            'is_processed': has_solution,          # 同步回傳，向下相容
+            'case_status': '已結案' if has_solution else '未結案',
             'abn_msg': self.abn_msg,
             'abn_solution': self.abn_solution,
             'processed_memid': self.processed_memid,
-            'processed_memname': self.responsible_user.name if self.responsible_user else (self.processed_memid if self.processed_memid else '未指派'),
+            'processed_memname': handler_name,
             'processed_time': self.processed_time.isoformat() if self.processed_time else None,
             'tracking_id': tracking_id,
             # abnormal_type will be enriched by API

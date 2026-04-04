@@ -7,7 +7,7 @@ from app import db
 from app.models.Mortor_inspection import TJob, InspectionResult
 from app.models.Mortor_equipment import TEquipment, EquitCheckItem
 from app.models.Mortor_abnormal import AbnormalCases
-from app.models.Mortor_organization import TOrganization
+from app.models.Mortor_organization import TOrganization, HrOrganization
 from app.models.Mortor_user import HrAccount
 from app.auth.jwt_handler import token_required
 from app.utils.decorators import log_request, web_or_api_required
@@ -17,6 +17,47 @@ from sqlalchemy import func
 
 inspection_bp = Blueprint('inspection', __name__)
 
+
+def get_descendant_org_ids(org_id: str) -> list:
+    """
+    遞迴取得指定組織及其所有子孫組織的 ID 列表
+    選取父組織時自動包含所有下層子組織
+    """
+    result = [org_id]
+    children = HrOrganization.query.filter_by(parentid=org_id).all()
+    for child in children:
+        result.extend(get_descendant_org_ids(child.id))
+    return result
+
+
+@inspection_bp.route('/options', methods=['GET'])
+@token_required
+@log_request
+def get_inspection_options(**kwargs):
+    """
+    動態取得檢驗項目的過濾選項（保養週期、馬達類別等）
+    """
+    # 查詢所有不重複且非空的 mterm
+    mterms = db.session.query(EquitCheckItem.mterm)\
+        .filter(EquitCheckItem.mterm != None, EquitCheckItem.mterm != '')\
+        .distinct().all()
+    
+    # 查詢所有不重複且非空的 grade
+    grades = db.session.query(EquitCheckItem.grade)\
+        .filter(EquitCheckItem.grade != None, EquitCheckItem.grade != '')\
+        .distinct().all()
+
+    # 將 tuples 解開並排序
+    mterm_list = sorted([m[0] for m in mterms])
+    grade_list = sorted([g[0] for g in grades])
+
+    return jsonify({
+        'status': 'success',
+        'data': {
+            'mterms': mterm_list,
+            'grades': grade_list
+        }
+    }), 200
 
 @inspection_bp.route('/statistics', methods=['GET'])
 @token_required
@@ -46,8 +87,8 @@ def get_dashboard_statistics(**kwargs):
     
     today_attention = 0  # 預留
     
-    accumulated_abnormal_open = AbnormalCases.query.filter_by(
-        is_processed=False
+    accumulated_abnormal_open = AbnormalCases.query.filter(
+        db.or_(AbnormalCases.abn_solution == None, AbnormalCases.abn_solution == '')
     ).count()
     
     accumulated_attention_open = 0
@@ -118,10 +159,10 @@ def query_inspection_records(**kwargs):
     # Build query
     query = TJob.query
     
-    # Organization filter (via Assigned User)
+    # Organization filter (via Assigned User) — 含所有子孫組織
     if org_id:
-        # act_mem_id
-        query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid == org_id)
+        org_ids = get_descendant_org_ids(org_id)
+        query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid.in_(org_ids))
     
     # Date range filter
     if start_date_str:
@@ -261,140 +302,276 @@ def get_inspection_record_details(task_id, **kwargs):
     }), 200
 
 
+@inspection_bp.route('/abnormal/<actid>/<item_id>', methods=['PUT'])
+@token_required
+@log_request
+def update_abnormal_solution(actid, item_id, **kwargs):
+    """
+    更新異常處理方式 (abn_solution)
+    自動記錄操作者為 processed_memid
+    """
+    try:
+        current_user = kwargs.get('current_user')
+
+        data = request.get_json()
+        if data is None:
+            return jsonify({
+                'status': 'error',
+                'message': '請提供 JSON 格式資料'
+            }), 400
+
+        abn_solution = data.get('abn_solution', '').strip()
+
+        # 查詢目標異常記錄
+        tracking = AbnormalCases.query.filter_by(
+            actid=actid, item_id=item_id
+        ).first()
+
+        if not tracking:
+            return jsonify({
+                'status': 'error',
+                'message': '找不到對應的異常記錄'
+            }), 404
+
+        # 更新欄位
+        tracking.abn_solution = abn_solution
+        tracking.processed_memid = current_user.id
+        tracking.processed_time = datetime.utcnow()
+        # 同步更新 is_processed，以 abn_solution 為唯一依據
+        tracking.is_processed = bool(abn_solution)
+
+        db.session.commit()
+
+        # 取得操作者名稱回傳前端
+        operator_name = current_user.name if hasattr(current_user, 'name') else current_user.id
+
+        return jsonify({
+            'status': 'success',
+            'message': '處理方式已儲存',
+            'data': {
+                'actid': actid,
+                'item_id': item_id,
+                'abn_solution': tracking.abn_solution,
+                'processed_memid': tracking.processed_memid,
+                'processed_memname': operator_name,
+                'processed_time': tracking.processed_time.isoformat() if tracking.processed_time else None
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Update abnormal solution error: {str(e)}')
+        return jsonify({
+            'status': 'error',
+            'message': f'儲存失敗: {str(e)}'
+        }), 500
+
+
 @inspection_bp.route('/abnormal/tracking', methods=['GET'])
 @token_required
 @log_request
 def query_abnormal_tracking(**kwargs):
     """
-    異常追蹤查詢
+    異常追蹤查詢 - 以工單為單位彙總
+    每張工單的結案狀態：所有項目皆有 abn_solution → 已結案，否則 → 未結案
     """
-    # Get filters
-    is_processed_str = request.args.get('is_processed')
-    case_status = request.args.get('case_status')  # 前端傳遞: 未結案/已結案
-    start_date_str = request.args.get('start_date')
-    end_date_str = request.args.get('end_date')
-    org_id = request.args.get('org_id')  # 組織篩選
-    equipment_id = request.args.get('equipment_id')  # 設備篩選
-    grade = request.args.get('group')  # 修正：前端傳送的參數名為 group
-    mterm = request.args.get('mterm')  # 保養週期 (1M/3M/6M/1Y)
-    abnormal_type = request.args.get('abnormal_type')  # 異常類型
-    
-    # Validate pagination
-    page, page_size, error = Validator.validate_pagination(
-        request.args.get('page'),
-        request.args.get('page_size'),
-        current_app.config['MAX_ITEMS_PER_PAGE']
-    )
-    
-    if error:
-        return jsonify({
-            'status': 'error',
-            'message': error
-        }), 400
-    
-    # Build query
-    query = AbnormalCases.query.join(InspectionResult, 
-        (AbnormalCases.actid == InspectionResult.actid) & 
-        (AbnormalCases.item_id == InspectionResult.item_id)
-    ).join(TJob, AbnormalCases.actid == TJob.actid
-    ).join(TEquipment, TJob.equipmentid == TEquipment.id, isouter=True)
-    
-    # Status filter (支援 is_processed 和 case_status 兩種傳參方式)
-    if case_status:
-        if case_status == '未結案':
-            query = query.filter(AbnormalCases.is_processed == False)
-        elif case_status == '已結案':
-            query = query.filter(AbnormalCases.is_processed == True)
-    elif is_processed_str:
-        is_processed = is_processed_str.lower() == 'true'
-        query = query.filter(AbnormalCases.is_processed == is_processed)
-    
-    # Organization filter
-    if org_id:
-        query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid == org_id)
-    
-    # Equipment filter
-    if equipment_id:
-        query = query.filter(AbnormalCases.equipmentid == equipment_id)
-    
-    # Grade filter (馬達類別)
-    if grade:
-        query = query.filter(TJob.grade == grade)
-    
-    # Mterm filter (保養週期)
-    if mterm:
-        query = query.filter(TJob.mterm == mterm)
-    
-    # Abnormal type filter
-    if abnormal_type:
-        if abnormal_type == '異常':
-            query = query.filter(InspectionResult.is_out_of_spec == 2)
-        elif abnormal_type == '注意':
-            query = query.filter(InspectionResult.is_out_of_spec == 3)
-    
-    # Date range filter
-    if start_date_str:
-        if not Validator.validate_date_format(start_date_str):
-            return jsonify({
-                'status': 'error',
-                'message': '開始日期格式錯誤'
-            }), 400
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        query = query.filter(func.date(InspectionResult.act_time) >= start_date)
-    
-    if end_date_str:
-        if not Validator.validate_date_format(end_date_str):
-            return jsonify({
-                'status': 'error',
-                'message': '結束日期格式錯誤'
-            }), 400
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        query = query.filter(func.date(InspectionResult.act_time) <= end_date)
-    
-    # Paginate
-    pagination = query.paginate(page=page, per_page=page_size, error_out=False)
-    
-    # Build response
-    tracking_data = []
-    for tracking in pagination.items:
-        tracking_dict = tracking.to_dict()
-        
-        result = InspectionResult.query.filter_by(
-            actid=tracking.actid,
-            item_id=tracking.item_id
-        ).first()
-            
-        if result:
-            tracking_dict['result_info'] = {
-                'act_key': result.job.act_key if result.job else None,
-                'equipment_name': result.job.equipment.name if result.job and result.job.equipment else None,
-                'item_name': result.check_item.item_name if result.check_item else None,
-                'measured_value': result.measured_value,
-                'act_time': result.act_time.isoformat() if result.act_time else None,
-                'inspector_name': result.act_mem_id
-            }
-            
-            # P1-6：修正語意— is_out_of_spec=3 是停機，不是「注意」
-            if result.is_out_of_spec == 2:
-                tracking_dict['abnormal_type'] = '異常'
-            elif result.is_out_of_spec == 3:
-                tracking_dict['abnormal_type'] = '停機'
+    case_status   = request.args.get('case_status')       # 未結案 / 已結案 / '' 全部
+    start_date_str= request.args.get('start_date')
+    end_date_str  = request.args.get('end_date')
+    org_id        = request.args.get('org_id')
+    equipment_id  = request.args.get('equipment_id')
+    grade         = request.args.get('group')
+    mterm         = request.args.get('mterm')
+    abnormal_type = request.args.get('abnormal_type')
+    page          = request.args.get('page', 1, type=int)
+    page_size     = request.args.get('page_size', 200, type=int)
+
+    try:
+        # 取得所有有異常記錄的工單（以 actid DISTINCT）
+        job_query = TJob.query.join(
+            AbnormalCases, TJob.actid == AbnormalCases.actid
+        ).distinct()
+
+        if org_id:
+            org_ids = get_descendant_org_ids(org_id)
+            job_query = job_query.join(
+                HrAccount, TJob.act_mem_id == HrAccount.id, isouter=True
+            ).filter(HrAccount.organizationid.in_(org_ids))
+
+        if equipment_id:
+            job_query = job_query.filter(TJob.equipmentid == equipment_id)
+
+        if grade:
+            job_query = job_query.filter(TJob.grade == grade)
+
+        if mterm:
+            job_query = job_query.filter(TJob.mterm == mterm)
+
+        if start_date_str:
+            job_query = job_query.filter(TJob.mdate >= start_date_str.replace('-', ''))
+
+        if end_date_str:
+            job_query = job_query.filter(TJob.mdate <= end_date_str.replace('-', ''))
+
+        # 異常類型篩選：exists 子查詢，不產生重複列
+        # abnormal_type: '異常'(is_out_of_spec=2) / '停機'(is_out_of_spec=3)
+        if abnormal_type:
+            from sqlalchemy import exists as sa_exists
+            if abnormal_type == '異常':
+                spec_val = 2
+            elif abnormal_type == '停機':
+                spec_val = 3
             else:
-                tracking_dict['abnormal_type'] = '異常'  # 預設
-        else:
-             tracking_dict['abnormal_type'] = '異常'
-        
-        tracking_data.append(tracking_dict)
-    
-    return jsonify({
-        'status': 'success',
-        'data': {
-            'total': pagination.total,
-            'page': page,
-            'page_size': page_size,
-            'tracking_records': tracking_data
-        }
-    }), 200
+                spec_val = None
+            if spec_val is not None:
+                abnormal_type_sq = sa_exists().where(
+                    (InspectionResult.actid == TJob.actid) &
+                    (InspectionResult.is_out_of_spec == spec_val)
+                )
+                job_query = job_query.filter(abnormal_type_sq)
+
+        jobs = job_query.order_by(TJob.mdate.desc()).all()
+
+        # Python 端彙總每張工單的異常統計
+        result_data = []
+        for job in jobs:
+            abn_items = AbnormalCases.query.filter_by(actid=job.actid).all()
+            if not abn_items:
+                continue
+
+            total     = len(abn_items)
+            open_cnt  = sum(1 for i in abn_items
+                            if not (i.abn_solution and i.abn_solution.strip()))
+            closed_cnt = total - open_cnt
+            job_status = '已結案' if open_cnt == 0 else '未結案'
+
+            # 工單層級結案狀態篩選
+            if case_status == '未結案' and job_status != '未結案':
+                continue
+            if case_status == '已結案' and job_status != '已結案':
+                continue
+
+            # 格式化日期 YYYYMMDD → YYYY-MM-DD
+            mdate_str = job.mdate or ''
+            if len(mdate_str) == 8:
+                mdate_str = f"{mdate_str[:4]}-{mdate_str[4:6]}-{mdate_str[6:]}"
+
+            # 最近一筆異常時間
+            latest = (InspectionResult.query
+                      .filter(InspectionResult.actid == job.actid,
+                              InspectionResult.is_out_of_spec >= 2)
+                      .order_by(InspectionResult.act_time.desc())
+                      .first())
+            latest_time = (latest.act_time.isoformat()
+                           if latest and latest.act_time else None)
+
+            equipment = job.equipment
+            result_data.append({
+                'actid':               job.actid,
+                'act_key':             job.act_key or job.actid,
+                'equipment_name':      equipment.name if equipment else '-',
+                'equipmentid':         job.equipmentid,
+                'grade':               job.grade or '-',
+                'mterm':               job.mterm or '-',
+                'mdate':               mdate_str,
+                'total_abnormal_count': total,
+                'open_count':          open_cnt,
+                'closed_count':        closed_cnt,
+                'case_status':         job_status,
+                'latest_found_time':   latest_time,
+            })
+
+        # Python 端分頁（已在 Python 做 case_status 過濾，DB 無法準確分頁）
+        total_count  = len(result_data)
+        start_idx    = (page - 1) * page_size
+        paginated    = result_data[start_idx: start_idx + page_size]
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'total':            total_count,
+                'page':             page,
+                'page_size':        page_size,
+                'tracking_records': paginated,
+            }
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f'Abnormal tracking error: {str(e)}')
+        return jsonify({'status': 'error', 'message': f'查詢失敗: {str(e)}'}), 500
+
+
+@inspection_bp.route('/abnormal/job/<actid>', methods=['GET'])
+@token_required
+@log_request
+def get_job_abnormal_items(actid, **kwargs):
+    """
+    取得特定工單的所有異常項目明細
+    供前端 Modal 顯示使用
+    """
+    try:
+        job = TJob.query.get(actid)
+        if not job:
+            return jsonify({'status': 'error', 'message': '工單不存在'}), 404
+
+        from app.models.Mortor_equipment import EquitCheckItem
+        abn_items = AbnormalCases.query.filter_by(actid=actid).all()
+
+        items_data = []
+        for item in abn_items:
+            result = InspectionResult.query.filter_by(
+                actid=actid, item_id=item.item_id
+            ).first()
+            check_item = EquitCheckItem.query.get(item.item_id)
+
+            item_dict = item.to_dict()
+
+            # 補充量測時間與異常類型（來自 InspectionResult）
+            if result:
+                item_dict['act_time'] = result.act_time.isoformat() if result.act_time else None
+                if result.is_out_of_spec == 2:
+                    item_dict['abnormal_type'] = '異常'
+                elif result.is_out_of_spec >= 3:
+                    item_dict['abnormal_type'] = '停機'  # is_out_of_spec=3 語意為停機，對齊 APP 端定義
+                else:
+                    item_dict['abnormal_type'] = '異常'
+            else:
+                item_dict['act_time'] = None
+                item_dict['abnormal_type'] = '異常'
+
+            # 補充項目名稱與單位
+            if check_item:
+                item_dict['item_name'] = check_item.item_name
+                item_dict['unit'] = check_item.unit or ''
+            else:
+                item_dict['item_name'] = item.item_id
+                item_dict['unit'] = ''
+
+            items_data.append(item_dict)
+
+        equipment = job.equipment
+        mdate_str = job.mdate or ''
+        if len(mdate_str) == 8:
+            mdate_str = f"{mdate_str[:4]}-{mdate_str[4:6]}-{mdate_str[6:]}"
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'job': {
+                    'actid':          job.actid,
+                    'act_key':        job.act_key or job.actid,
+                    'equipment_name': equipment.name if equipment else '-',
+                    'grade':          job.grade or '-',
+                    'mterm':          job.mterm or '-',
+                    'mdate':          mdate_str,
+                },
+                'abnormal_items': items_data,
+            }
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f'Job abnormal items error: {str(e)}')
+        return jsonify({'status': 'error', 'message': f'查詢失敗: {str(e)}'}), 500
 
 
 @inspection_bp.route('/progress', methods=['GET'])
@@ -419,7 +596,8 @@ def query_inspection_progress(**kwargs):
         )
 
         if org_id:
-            query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid == org_id)
+            org_ids = get_descendant_org_ids(org_id)
+            query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid.in_(org_ids))
         if start_date:
             query = query.filter(TJob.mdate >= start_date.replace('-', ''))
         if end_date:
@@ -1042,3 +1220,84 @@ def get_comparison_equip_trend(**kwargs):
         import traceback as tb
         current_app.logger.error(f'equip-trend error:\n{tb.format_exc()}')
         return jsonify({'status': 'error', 'message': f'查詢失敗: {str(e)}'}), 500
+
+
+@inspection_bp.route('/export/actid/<actid>', methods=['GET'])
+@token_required
+@log_request
+def export_actid_report(actid, **kwargs):
+    """
+    匯出特定工單的量測紀錄報表 (.csv)
+    欄位: 異常, 設備代號, 設備名稱, 檢查項目代號, 檢查項目描述, 檢查日期, 檢查時間, 檢查結果, 上限警戒值, 上限值, 單位, 異常原因, 處理對策
+    """
+    import csv
+    import io
+    from flask import Response
+    from app.models.Mortor_equipment import EquitCheckItem, TEquipment
+    
+    try:
+        # Get Job info for the filename
+        job = TJob.query.get(actid)
+        if not job:
+            return jsonify({'status': 'error', 'message': '找不到該工單'}), 404
+            
+        act_key = job.act_key or actid
+
+        # Query all measurements for this job
+        results = InspectionResult.query.filter_by(actid=actid).order_by(InspectionResult.act_time).all()
+        
+        # Prepare CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        headers = [
+            '異常', '設備代號', '設備名稱', '檢查項目代號', '檢查項目描述', 
+            '檢查日期', '檢查時間', '檢查結果', '上限警戒值', '上限值', 
+            '單位', '異常原因', '處理對策'
+        ]
+        writer.writerow(headers)
+        
+        for r in results:
+            eq = TEquipment.query.get(r.equipmentid) if r.equipmentid else None
+            eq_name = eq.name if eq else ''
+            
+            item = EquitCheckItem.query.filter_by(item_id=r.item_id).first() if r.item_id else None
+            item_desc = item.item_desc if item else ''
+            max_v = item.max_v if item else ''
+            unit = item.unit if item else ''
+            
+            abnormal_case = AbnormalCases.query.filter_by(actid=actid, item_id=r.item_id).first()
+            abn_solution = abnormal_case.abn_solution if abnormal_case else ''
+            abn_reason = abnormal_case.abn_msg if abnormal_case else ''
+            
+            is_abnormal = '是' if r.is_out_of_spec and r.is_out_of_spec >= 2 else '否'
+            dt = r.act_time
+            d_str = dt.strftime('%Y-%m-%d') if dt else ''
+            t_str = dt.strftime('%H:%M:%S') if dt else ''
+            
+            writer.writerow([
+                is_abnormal,
+                r.equipmentid or '',
+                eq_name,
+                r.item_id or '',
+                item_desc,
+                d_str,
+                t_str,
+                r.measured_value or '',
+                '', # 上限警戒值 (目前系統無此獨立欄位)
+                max_v or '',
+                unit,
+                abn_reason,
+                abn_solution
+            ])
+            
+        # Create response with utf-8-sig (BOM) for Excel
+        csv_data = output.getvalue()
+        response = Response(csv_data.encode('utf-8-sig'), mimetype='text/csv')
+        response.headers['Content-Disposition'] = f'attachment; filename={act_key}.csv'
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f"單張工單匯出發生例外: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500

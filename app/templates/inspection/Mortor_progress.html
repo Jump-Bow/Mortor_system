@@ -53,7 +53,18 @@
         border-radius: 4px;
         cursor: pointer;
     }
+    
+    /* 組織樹狀選取器 */
+    .org-picker-wrap { position:relative; display:inline-block; width:100%; }
+    .org-tree-drop {
+        position:fixed; z-index:9999; background:#fff;
+        border:1px solid #dee2e6; border-radius:6px;
+        box-shadow:0 6px 20px rgba(0,0,0,.15);
+        padding:8px; min-width:240px; max-height:340px;
+        overflow-y:auto; display:none;
+    }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/jstree/themes/default/style-3.3.15.min.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -68,9 +79,17 @@
                 <div class="col-md-3">
                     <div class="form-group">
                         <label>組織 (巡檢路線/派工)</label>
-                        <select id="filter-org" class="form-control select2" style="width: 100%;">
-                            <option value="">全部組織</option>
-                        </select>
+                        <div class="org-picker-wrap">
+                            <button type="button" id="progress-org-btn" class="btn btn-outline-secondary btn-block text-left">
+                                <i class="fas fa-sitemap mr-1"></i><span id="progress-org-label">全部組織</span>
+                            </button>
+                            <input type="hidden" id="filter-org" name="org_id" value="">
+                        </div>
+                        <!-- 組織樹狀浮層 -->
+                        <div id="progress-org-drop" class="org-tree-drop">
+                            <input class="form-control form-control-sm mb-1" id="progress-org-search" placeholder="搜尋組織...">
+                            <div id="progress-org-tree"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-2">
@@ -90,10 +109,6 @@
                         <label>馬達類別</label>
                         <select id="filter-group" class="form-control">
                             <option value="">全部</option>
-                            <option value="A">A 級</option>
-                            <option value="B">B 級</option>
-                            <option value="C">C 級</option>
-                            <option value="D">D 級</option>
                         </select>
                     </div>
                 </div>
@@ -109,10 +124,6 @@
                         <label>保養週期</label>
                         <select id="filter-mterm" class="form-control">
                             <option value="">全部</option>
-                            <option value="1M">每月 (1M)</option>
-                            <option value="3M">每季 (3M)</option>
-                            <option value="6M">半年 (6M)</option>
-                            <option value="1Y">每年 (1Y)</option>
                         </select>
                     </div>
                 </div>
@@ -301,12 +312,14 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='vendor/jstree/jstree-3.3.15.min.js') }}"></script>
 <script>
     let pieChartInstance = null;
+    let progressOrgTreeLoaded = false;
 
     $(document).ready(function () {
-        $('.select2').select2({ theme: 'bootstrap4' });
-        loadOrganizations();
+        initProgressOrgPicker();
+        loadOptions();
 
         $('#search-form').on('submit', function (e) {
             e.preventDefault();
@@ -314,23 +327,79 @@
         });
     });
 
-    function loadOrganizations() {
+    /* ===== 動態載入選項 ===== */
+    function loadOptions() {
         $.ajax({
-            url: '/api/v1/facilities/list',
-            method: 'GET',
-            success: function (response) {
-                if (response.status === 'success' && response.data) {
-                    const select = $('#filter-org');
-                    const orgs = response.data.facilities || response.data;
-                    if (Array.isArray(orgs)) {
-                        orgs.forEach(function (org) {
-                            select.append(`<option value="${org.unitid}">${org.unitname}</option>`);
-                        });
-                    }
+            url: '/api/v1/inspection/options', method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+            success: function (res) {
+                if (res.status === 'success') {
+                    const d = res.data;
+                    d.grades.forEach(g => $('#filter-group').append(`<option value="${g}">${g} 級</option>`));
+                    d.mterms.forEach(m => $('#filter-mterm').append(`<option value="${m}">${m}</option>`));
                 }
             }
         });
     }
+
+    function initProgressOrgPicker() {
+        const $btn = $('#progress-org-btn'), $drop = $('#progress-org-drop'), $input = $('#filter-org');
+        
+        $btn.on('click', function (e) {
+            e.stopPropagation();
+            if ($drop.is(':visible')) { $drop.hide(); return; }
+            const off = $btn.offset();
+            $drop.css({ top: off.top + $btn.outerHeight() + 4, left: off.left });
+            $drop.show();
+            if (!progressOrgTreeLoaded) loadProgressOrgTree();
+        });
+        
+        $(document).on('click.prog_org', function (e) {
+            if (!$(e.target).closest('#progress-org-drop,#progress-org-btn').length) $drop.hide();
+        });
+        
+        $('#progress-org-search').on('input', function () {
+            if (progressOrgTreeLoaded) $('#progress-org-tree').jstree(true).search($(this).val());
+        });
+    }
+
+    function loadProgressOrgTree() {
+        progressOrgTreeLoaded = true;
+        $.ajax({
+            url: '/api/v1/organizations/tree', method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+            success: function (res) {
+                if (res.status !== 'success') return;
+                const nodes = buildOrgNodes(res.data.organizations || [], '#');
+                nodes.unshift({ id: '__all__', text: '✦ 全部組織', parent: '#', state: { opened: true } });
+                
+                $('#progress-org-tree').jstree({
+                    core: { data: nodes, themes: { icons: false } },
+                    plugins: ['search'], search: { show_only_matches: true }
+                }).on('select_node.jstree', function (e, data) {
+                    if (data.node.id === '__all__') { 
+                        $('#filter-org').val(''); 
+                        $('#progress-org-label').text('全部組織'); 
+                    } else { 
+                        $('#filter-org').val(data.node.id); 
+                        $('#progress-org-label').text(data.node.text); 
+                    }
+                    $('#progress-org-drop').hide();
+                });
+            }
+        });
+    }
+
+    function buildOrgNodes(orgs, parentId) {
+        let r = [];
+        orgs.forEach(function (o) {
+            r.push({ id: o.id, text: o.name, parent: parentId, state: { opened: true } });
+            if (o.children && o.children.length) r = r.concat(buildOrgNodes(o.children, o.id));
+        });
+        return r;
+    }
+
+
 
     function searchProgress(page) {
         const params = {

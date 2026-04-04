@@ -169,6 +169,22 @@ def aims_equipment_measurements(actid, equipmentid, **kwargs):
                 result_dict['min_v'] = result.check_item.min_v
                 result_dict['unit'] = result.check_item.unit
                 result_dict['status_type'] = result.check_item.status_type
+            # 加入異常追蹤資料（abn_msg / abn_solution / processed_memname）
+            abnormal = AbnormalCases.query.filter_by(
+                actid=actid, item_id=result.item_id
+            ).first()
+            if abnormal:
+                result_dict['abn_msg'] = abnormal.abn_msg
+                result_dict['abn_solution'] = abnormal.abn_solution
+                result_dict['is_processed'] = abnormal.is_processed
+                result_dict['processed_memname'] = (
+                    abnormal.responsible_user.name
+                    if abnormal.responsible_user else abnormal.processed_memid
+                )
+            else:
+                result_dict['abn_msg'] = None
+                result_dict['abn_solution'] = None
+                result_dict['processed_memname'] = None
             measurements.append(result_dict)
 
         return jsonify({
