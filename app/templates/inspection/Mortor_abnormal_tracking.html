@@ -48,7 +48,7 @@
                 <select class="form-control" id="abnormal-type" name="abnormal_type">
                   <option value="">全部</option>
                   <option value="異常">異常</option>
-                  <option value="注意">注意</option>
+                  <option value="停機">停機</option>
                 </select>
               </div>
             </div>
@@ -415,8 +415,8 @@ function renderJobDetail(data) {
       <tbody>`;
 
   items.forEach(function (item) {
-    const typeBadge = item.abnormal_type === '注意'
-      ? '<span class="badge badge-warning">注意</span>'
+    const typeBadge = item.abnormal_type === '停機'
+      ? '<span class="badge badge-dark">停機</span>'
       : '<span class="badge badge-danger">異常</span>';
     const statusBadge = item.case_status === '已結案'
       ? '<span class="badge badge-success">已結案</span>'

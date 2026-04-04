@@ -275,11 +275,13 @@ def get_inspection_record_details(task_id, **kwargs):
             item_dict = item.to_dict()
             
             if result:
+                # P1-8：取真實姓名，不再回傳 ID
+                inspector = HrAccount.query.get(result.act_mem_id) if result.act_mem_id else None
                 item_dict['result'] = {
                     'measured_value': result.measured_value,
                     'is_out_of_spec': result.is_out_of_spec,
                     'act_time': result.act_time.isoformat() if result.act_time else None,
-                    'inspector_name': result.act_mem_id, # Simplified, or fetch user name
+                    'inspector_name': inspector.name if inspector else result.act_mem_id,
                     'result_photo': result.result_photo
                 }
             else:
@@ -412,14 +414,21 @@ def query_abnormal_tracking(**kwargs):
             job_query = job_query.filter(TJob.mdate <= end_date_str.replace('-', ''))
 
         # 異常類型篩選：exists 子查詢，不產生重複列
+        # abnormal_type: '異常'(is_out_of_spec=2) / '停機'(is_out_of_spec=3)
         if abnormal_type:
             from sqlalchemy import exists as sa_exists
-            spec_val = 2 if abnormal_type == '異常' else 3
-            abnormal_type_sq = sa_exists().where(
-                (InspectionResult.actid == TJob.actid) &
-                (InspectionResult.is_out_of_spec == spec_val)
-            )
-            job_query = job_query.filter(abnormal_type_sq)
+            if abnormal_type == '異常':
+                spec_val = 2
+            elif abnormal_type == '停機':
+                spec_val = 3
+            else:
+                spec_val = None
+            if spec_val is not None:
+                abnormal_type_sq = sa_exists().where(
+                    (InspectionResult.actid == TJob.actid) &
+                    (InspectionResult.is_out_of_spec == spec_val)
+                )
+                job_query = job_query.filter(abnormal_type_sq)
 
         jobs = job_query.order_by(TJob.mdate.desc()).all()
 
@@ -523,7 +532,7 @@ def get_job_abnormal_items(actid, **kwargs):
                 if result.is_out_of_spec == 2:
                     item_dict['abnormal_type'] = '異常'
                 elif result.is_out_of_spec >= 3:
-                    item_dict['abnormal_type'] = '注意'
+                    item_dict['abnormal_type'] = '停機'  # is_out_of_spec=3 語意為停機，對齊 APP 端定義
                 else:
                     item_dict['abnormal_type'] = '異常'
             else:
@@ -901,7 +910,10 @@ def get_inspection_calendar(**kwargs):
             total_items = EquitCheckItem.query.filter_by(
                 grade=job.grade, mterm=job.mterm
             ).count()
-            completed_items = job.results.count()
+            # P1-5：完成數不計入 is_out_of_spec=0（未填寫的空白紀錄）
+            completed_items = job.results.filter(
+                InspectionResult.is_out_of_spec != 0
+            ).count()
             if total_items > 0 and completed_items >= total_items:
                 daily_stats[d_str]['completed'] += 1
 

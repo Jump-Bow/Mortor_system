@@ -36,7 +36,10 @@ class TJob(db.Model):
         from app.models.Mortor_equipment import EquitCheckItem
         total_items = EquitCheckItem.query.filter_by(grade=self.grade, mterm=self.mterm).count()
             
-        completed_items = self.results.count()
+        # P1-5：completed_items 不計入 is_out_of_spec=0（未填寫 / 取消停機後的空白紀錄）
+        completed_items = self.results.filter(
+            InspectionResult.is_out_of_spec != 0
+        ).count()
         
         status = '未派工'
         if completed_items > 0:

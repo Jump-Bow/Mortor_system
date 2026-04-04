@@ -51,7 +51,9 @@ def download_tasks(**kwargs):
     tasks_query = TJob.query.filter_by(act_mem_id=user_id)
     
     if date_str:
-        tasks_query = tasks_query.filter(TJob.mdate >= filter_date)
+        # P2-9：mdate 是 VARCHAR(8)，統一轉為 YYYYMMDD 字串比較
+        filter_date_str = filter_date.strftime('%Y%m%d')
+        tasks_query = tasks_query.filter(TJob.mdate >= filter_date_str)
     
     tasks = tasks_query.all()
     
@@ -61,34 +63,38 @@ def download_tasks(**kwargs):
         assigned_user = task.assigned_user if task.act_mem_id else None
         equipment = task.equipment
         
-        # Get check items for this equipment
+        # P0-1：巡檢項目改為查通用表（按 grade/mterm），不再用已移除的 equipment.check_items 關聯
+        check_items_objs = EquitCheckItem.query.filter_by(
+            grade=task.grade,
+            mterm=task.mterm
+        ).order_by(EquitCheckItem.sort_order).all()
+
         check_items = []
-        if equipment:
-            for item in equipment.check_items.order_by(EquitCheckItem.item_id):
-                check_items.append({
-                    'item_id': item.item_id,
-                    'item_name': item.item_name,
-                    'item_desc': item.item_desc,
-                    'status_type': item.status_type,
-                    'max_v': item.max_v,
-                    'min_v': item.min_v,
-                    'sort_order': item.sort_order,
-                    'grade': item.grade,
-                    'mterm': item.mterm,
-                    'unit': item.unit,
-                    'data_type': '數值' if item.max_v or item.min_v else '文字',
-                    'is_required': True
-                })
-        
-        # Calculate completion rate
-        total_items = 0
+        for item in check_items_objs:
+            check_items.append({
+                'item_id': item.item_id,
+                'item_name': item.item_name,
+                'item_desc': item.item_desc,
+                'status_type': item.status_type,
+                'max_v': item.max_v,
+                'min_v': item.min_v,
+                'sort_order': item.sort_order,
+                'grade': item.grade,
+                'mterm': item.mterm,
+                'unit': item.unit,
+                'data_type': '數值' if item.max_v or item.min_v else '文字',
+                'is_required': True
+            })
+
+        # P1-7：完成數排除 is_out_of_spec=0（未填寫 / 取消停機後的空白紀錄）
+        total_items = len(check_items)
         completed_items = 0
-        
-        if task.equipment:
-            total_items = task.equipment.check_items.count()
-            
+
         if total_items > 0:
-            completed_items = task.results.count()
+            from app.models.Mortor_inspection import InspectionResult
+            completed_items = task.results.filter(
+                InspectionResult.is_out_of_spec != 0
+            ).count()
             completion_rate = (completed_items / total_items) * 100
         else:
             completion_rate = 0
@@ -102,12 +108,16 @@ def download_tasks(**kwargs):
             'act_key': task.act_key,
             'equipmentid': task.equipmentid,
             'equipment_name': equipment.name if equipment else None,
-            'mdate': task.mdate if task.mdate else None, # mdate is String in new schema? No, DB_SCHEMA says VARCHAR(8), I mapped to String(8).
+            'mdate': task.mdate if task.mdate else None,
             'act_desc': task.act_desc,
             'act_mem_id': task.act_mem_id,
             'act_mem': assigned_user.name if assigned_user else task.act_mem,
             'grade': task.grade,
             'mterm': task.mterm,
+            # P0-B：App TaskModel.fromJson 讀 total_items / completed_items
+            # completed_items 需與 P1-7 一致：排除 is_out_of_spec=0（未填寫）
+            'total_items': total_items,
+            'completed_items': completed_items,
             'completion_rate': round(completion_rate, 1),
             'unitid': equipment.unitid if equipment else None,
             'unitname': equipment.facility.unitname if equipment and equipment.facility else None,
