@@ -8,6 +8,7 @@ from app.models.Mortor_equipment import TEquipment
 from app.auth.jwt_handler import token_required
 from app.utils.decorators import log_request
 from app.utils.validators import Validator
+from app.api.Mortor_inspection import get_descendant_unit_ids
 
 facilities_bp = Blueprint('facilities', __name__)
 
@@ -47,7 +48,8 @@ def list_facilities(**kwargs):
     取得設施列表 (扁平結構)
     
     Query Parameters:
-        - parent_id: 上層設施 ID (可選)
+        - org_id: 選取組織 ID，含所有子孫設施 (可選)
+        - parent_id: 生層設施 ID，只查直屬子設施 (可選)
         - unittype: 設施類型 (可選)
         - page: 頁碼
         - page_size: 每頁筆數
@@ -57,7 +59,8 @@ def list_facilities(**kwargs):
         - pagination: 分頁資訊
     """
     # Get filters
-    parent_id = request.args.get('parent_id')
+    org_id = request.args.get('org_id')      # 含子孫遞迴查詢
+    parent_id = request.args.get('parent_id')  # 只查直屬子設施
     unittype = request.args.get('unittype')
     
     # Validate pagination
@@ -76,7 +79,12 @@ def list_facilities(**kwargs):
     # Build query
     query = TOrganization.query
     
-    if parent_id:
+    if org_id:
+        # 含子孫設施遞迴查詢
+        unit_ids = get_descendant_unit_ids(org_id)
+        query = query.filter(TOrganization.unitid.in_(unit_ids))
+    elif parent_id:
+        # 只查直屬子設施
         query = query.filter_by(parentunitid=parent_id)
     
     if unittype:

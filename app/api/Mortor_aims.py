@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify, current_app
 from app.models.Mortor_inspection import TJob, InspectionResult
 from app.models.Mortor_equipment import TEquipment
 from app.models.Mortor_abnormal import AbnormalCases
+from app.api.Mortor_inspection import get_descendant_unit_ids
 from app.auth.jwt_handler import token_required
 from app.utils.decorators import log_request
 from datetime import datetime
@@ -39,7 +40,8 @@ def aims_progress_list(**kwargs):
 
         # 篩選條件
         if org_id:
-            query = query.filter(TEquipment.unitid == org_id)
+            unit_ids = get_descendant_unit_ids(org_id)
+            query = query.filter(TEquipment.unitid.in_(unit_ids))
         if start_date:
             query = query.filter(TJob.mdate >= start_date.replace('-', ''))
         if end_date:
@@ -61,7 +63,8 @@ def aims_progress_list(**kwargs):
         # 統計
         all_jobs = TJob.query
         if org_id:
-            all_jobs = all_jobs.join(TEquipment, TJob.equipmentid == TEquipment.id).filter(TEquipment.unitid == org_id)
+            unit_ids = get_descendant_unit_ids(org_id)
+            all_jobs = all_jobs.join(TEquipment, TJob.equipmentid == TEquipment.id).filter(TEquipment.unitid.in_(unit_ids))
         if start_date:
             all_jobs = all_jobs.filter(TJob.mdate >= start_date.replace('-', ''))
         if end_date:
@@ -222,7 +225,8 @@ def aims_progress_export(**kwargs):
         query = TJob.query.join(TEquipment, TJob.equipmentid == TEquipment.id, isouter=True)
 
         if org_id:
-            query = query.filter(TEquipment.unitid == org_id)
+            unit_ids = get_descendant_unit_ids(org_id)
+            query = query.filter(TEquipment.unitid.in_(unit_ids))
         if start_date:
             query = query.filter(TJob.mdate >= start_date.replace('-', ''))
         if end_date:

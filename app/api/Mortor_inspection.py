@@ -20,13 +20,25 @@ inspection_bp = Blueprint('inspection', __name__)
 
 def get_descendant_org_ids(org_id: str) -> list:
     """
-    遞迴取得指定組織及其所有子孫組織的 ID 列表
+    遞迴取得指定組織及其所有子孫組織的 ID 列表（hr_organization）
     選取父組織時自動包含所有下層子組織
     """
     result = [org_id]
     children = HrOrganization.query.filter_by(parentid=org_id).all()
     for child in children:
         result.extend(get_descendant_org_ids(child.id))
+    return result
+
+
+def get_descendant_unit_ids(unit_id: str) -> list:
+    """
+    遞迴取得指定設施及其所有子孫設施的 unitid 列表（t_organization）
+    用於以設備所在設施組織（TOrganization）過濾設備資料
+    """
+    result = [unit_id]
+    children = TOrganization.query.filter_by(parentunitid=unit_id).all()
+    for child in children:
+        result.extend(get_descendant_unit_ids(child.unitid))
     return result
 
 
@@ -159,10 +171,10 @@ def query_inspection_records(**kwargs):
     # Build query
     query = TJob.query
     
-    # Organization filter (via Assigned User) — 含所有子孫組織
+    # Organization filter (via Equipment Location) — 含所有子孫設施
     if org_id:
-        org_ids = get_descendant_org_ids(org_id)
-        query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid.in_(org_ids))
+        unit_ids = get_descendant_unit_ids(org_id)
+        query = query.join(TEquipment, TJob.equipmentid == TEquipment.id, isouter=True).filter(TEquipment.unitid.in_(unit_ids))
     
     # Date range filter
     if start_date_str:
@@ -391,10 +403,10 @@ def query_abnormal_tracking(**kwargs):
         ).distinct()
 
         if org_id:
-            org_ids = get_descendant_org_ids(org_id)
+            unit_ids = get_descendant_unit_ids(org_id)
             job_query = job_query.join(
-                HrAccount, TJob.act_mem_id == HrAccount.id, isouter=True
-            ).filter(HrAccount.organizationid.in_(org_ids))
+                TEquipment, TJob.equipmentid == TEquipment.id, isouter=True
+            ).filter(TEquipment.unitid.in_(unit_ids))
 
         if equipment_id:
             job_query = job_query.filter(TJob.equipmentid == equipment_id)
@@ -587,8 +599,8 @@ def query_inspection_progress(**kwargs):
         )
 
         if org_id:
-            org_ids = get_descendant_org_ids(org_id)
-            query = query.join(HrAccount, TJob.act_mem_id == HrAccount.id).filter(HrAccount.organizationid.in_(org_ids))
+            unit_ids = get_descendant_unit_ids(org_id)
+            query = query.filter(TEquipment.unitid.in_(unit_ids))
         if start_date:
             query = query.filter(TJob.mdate >= start_date.replace('-', ''))
         if end_date:
@@ -767,7 +779,8 @@ def query_equipment_comparison(**kwargs):
         # 查詢設備
         equip_query = TEquipment.query
         if org_id:
-            equip_query = equip_query.filter(TEquipment.unitid == org_id)
+            unit_ids = get_descendant_unit_ids(org_id)
+            equip_query = equip_query.filter(TEquipment.unitid.in_(unit_ids))
 
         # 透過 jobs 篩選 grade
         if grade:
@@ -957,7 +970,8 @@ def get_inspection_comparison(**kwargs):
         query = TJob.query.join(TEquipment, TJob.equipmentid == TEquipment.id, isouter=True)
 
         if org_id:
-            query = query.filter(TEquipment.unitid == org_id)
+            unit_ids = get_descendant_unit_ids(org_id)
+            query = query.filter(TEquipment.unitid.in_(unit_ids))
         if group:
             query = query.filter(TJob.grade == group)
         if start_date:
