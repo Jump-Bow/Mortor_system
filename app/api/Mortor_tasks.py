@@ -12,6 +12,7 @@ from app.utils.decorators import log_request
 from app.utils.validators import Validator
 from datetime import datetime, date
 import uuid
+from app.utils.inspection_status import InspectionStatus
 
 tasks_bp = Blueprint('tasks', __name__)
 
@@ -93,7 +94,7 @@ def download_tasks(**kwargs):
         if total_items > 0:
             from app.models.Mortor_inspection import InspectionResult
             completed_items = task.results.filter(
-                InspectionResult.is_out_of_spec != 0
+                InspectionResult.is_out_of_spec != InspectionStatus.CREATED
             ).count()
             completion_rate = (completed_items / total_items) * 100
         else:

@@ -152,7 +152,8 @@ fem-admin/
 │   │   ├── decorators.py          #    裝飾器 (驗證、日誌、限流)
 │   │   ├── validators.py          #    資料驗證器
 │   │   ├── file_helpers.py        #    檔案處理工具
-│   │   └── mock_data_service.py   #    模擬資料服務
+│   │   ├── mock_data_service.py   #    模擬資料服務
+│   │   └── inspection_status.py  #    ★ 巡檢狀態 Enum (v1.3+，消除魔術數字 0/1/2/3)
 │   │
 │   └── swagger/                   # 📖 API 文件
 │       └── swagger.json           #    Swagger/OpenAPI 規格
@@ -639,7 +640,9 @@ result = db.session.query(InspectionResult).filter_by(
 - [系統規格說明](system-spec.md)
 - [開發環境設定](DEVELOPMENT.md)
 - [Web UI 指南](WEB_UI_GUIDE.md)
+- [★ 架構改善紀錄 v1.3](ARCHITECTURE_REFACTORING_v1.3.md)
+- [★ Flask 前後端分離指南](FLASK_DECOUPLING_GUIDE.md)
 
 ---
 
-*文件更新日期：2026-04-08*
+*文件更新日期：2026-04-09*

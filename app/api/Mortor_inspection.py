@@ -14,6 +14,7 @@ from app.utils.decorators import log_request, web_or_api_required
 from app.utils.validators import Validator
 from datetime import datetime, date
 from sqlalchemy import func
+from app.utils.inspection_status import InspectionStatus
 
 inspection_bp = Blueprint('inspection', __name__)
 
@@ -93,7 +94,7 @@ def get_dashboard_statistics(**kwargs):
     # Abnormal tracking statistics
     # is_out_of_spec: 0=已建立, 1=正常, 2=異常, 3=停機
     today_abnormal = db.session.query(func.count(InspectionResult.actid)).filter(
-        InspectionResult.is_out_of_spec >= 2,
+        InspectionResult.is_out_of_spec >= InspectionStatus.ABNORMAL,
         func.date(InspectionResult.act_time) == query_date
     ).scalar() or 0
     
@@ -115,7 +116,7 @@ def get_dashboard_statistics(**kwargs):
         func.count(func.distinct(InspectionResult.actid))
     ).join(TJob, InspectionResult.actid == TJob.actid).filter(
         TJob.mdate == query_date_str,
-        InspectionResult.is_out_of_spec >= 1  # 已執行（正常/異常/停機）
+        InspectionResult.is_out_of_spec >= InspectionStatus.NORMAL  # 已執行（正常/異常/停機）
     ).scalar() or 0
     
     return jsonify({
@@ -216,7 +217,7 @@ def query_inspection_records(**kwargs):
         has_abnormal = has_abnormal_str.lower() == 'true'
         if has_abnormal:
             query = query.join(InspectionResult).filter(
-                InspectionResult.is_out_of_spec >= 2
+                InspectionResult.is_out_of_spec >= InspectionStatus.ABNORMAL
             ).distinct()
     
     # Order by date descending
@@ -471,7 +472,7 @@ def query_abnormal_tracking(**kwargs):
             # 最近一筆異常時間
             latest = (InspectionResult.query
                       .filter(InspectionResult.actid == job.actid,
-                              InspectionResult.is_out_of_spec >= 2)
+                              InspectionResult.is_out_of_spec >= InspectionStatus.ABNORMAL)
                       .order_by(InspectionResult.act_time.desc())
                       .first())
             latest_time = (latest.act_time.isoformat()
@@ -541,10 +542,10 @@ def get_job_abnormal_items(actid, **kwargs):
             # 補充量測時間與異常類型（來自 InspectionResult）
             if result:
                 item_dict['act_time'] = result.act_time.isoformat() if result.act_time else None
-                if result.is_out_of_spec == 2:
+                if result.is_out_of_spec == InspectionStatus.ABNORMAL:
                     item_dict['abnormal_type'] = '異常'
-                elif result.is_out_of_spec >= 3:
-                    item_dict['abnormal_type'] = '停機'  # is_out_of_spec=3 語意為停機，對齊 APP 端定義
+                elif result.is_out_of_spec >= InspectionStatus.SHUTDOWN:
+                    item_dict['abnormal_type'] = '停機'  # SHUTDOWN 語意為停機，對齊 APP 端定義
                 else:
                     item_dict['abnormal_type'] = '異常'
             else:
@@ -925,14 +926,14 @@ def get_inspection_calendar(**kwargs):
             ).count()
             # P1-5：完成數不計入 is_out_of_spec=0（未填寫的空白紀錄）
             completed_items = job.results.filter(
-                InspectionResult.is_out_of_spec != 0
+                InspectionResult.is_out_of_spec != InspectionStatus.CREATED
             ).count()
             if total_items > 0 and completed_items >= total_items:
                 daily_stats[d_str]['completed'] += 1
 
             # 判斷是否有異常
             has_abnormal = job.results.filter(
-                InspectionResult.is_out_of_spec >= 2
+                InspectionResult.is_out_of_spec >= InspectionStatus.ABNORMAL
             ).count() > 0
             if has_abnormal:
                 daily_stats[d_str]['abnormal'] += 1
