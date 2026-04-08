@@ -575,6 +575,59 @@ document.addEventListener('DOMContentLoaded', loadTasks);
 | `run.py` | 應用程式進入點 |
 | `app/auth/jwt_handler.py` | JWT Token 驗證 |
 | `app/utils/decorators.py` | 常用裝飾器 |
+| `app/api/Mortor_tasks.py` | 工單下載 API `download_tasks`（APP 端主要依賴）|
+| `app/api/Mortor_results.py` | 巡檢結果上傳 API （`upload_results`、照片上傳）|
+
+---
+
+## 重要修正紀錄
+
+### 2025-04 APP 端相關 API 修正
+
+#### `Mortor_tasks.py` — `download_tasks` API
+
+**修正**：移除 `act_mem_id` 人員篩選
+
+```python
+# 修正前：將工單篩選為登入者本人指派的工單
+# query = query.filter(TJob.act_mem_id == current_user.id)  ← 已移除
+
+# 修正後：回傳所有工單，不篩選人員
+jobs = TJob.query.filter(
+    TJob.mdate.between(start_str, end_str)
+).order_by(TJob.mdate.desc()).all()
+```
+
+**原因**：Admin 尚未實作派工功能，`act_mem_id` 全部為 NULL。
+若保留篩選，現場人員登入後將一筆工單都下載不到。
+
+**待後續恢復**：實作 Admin 派工功能後，在此處補回：
+```python
+# query = query.filter(TJob.act_mem_id == current_user.id)
+```
+
+---
+
+#### `Mortor_results.py` — 照片上傳 API
+
+**修正**：照片上傳查詢補上 `equipmentid` 條件
+
+```python
+# 修正前：僅用 (actid, item_id) 查詢，對於複合主鍵可能更新錨層錄
+# result = db.session.query(InspectionResult).filter_by(
+#     actid=actid, item_id=item_id
+# ).first()
+
+# 修正後：使用完整三欄複合鍵
+result = db.session.query(InspectionResult).filter_by(
+    actid=actid,
+    equipmentid=equipmentid,  # ← 2025-04 P2B 新增
+    item_id=item_id
+).first()
+```
+
+**原因**：`InspectionResult` 表主鍵為 `(actid, equipmentid, item_id)` 三欄複合鍵。
+若僅用 `(actid, item_id)` 查詢，在同工單多台設備时可能写入錯誤紀錄。
 
 ---
 
@@ -589,4 +642,4 @@ document.addEventListener('DOMContentLoaded', loadTasks);
 
 ---
 
-*文件更新日期：2025-12-07*
+*文件更新日期：2026-04-08*
