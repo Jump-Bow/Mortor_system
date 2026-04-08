@@ -54,40 +54,7 @@ steps:
           --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest,AZURE_CLIENT_ID=FM_AZURE_CLIENT_ID:latest,AZURE_CLIENT_SECRET=FM_AZURE_CLIENT_SECRET:latest,AZURE_TENANT_ID=FM_AZURE_TENANT_ID:latest,AZURE_REDIRECT_URI=FM_AZURE_REDIRECT_URI:latest" \
           --allow-unauthenticated
 
-  # ==============================================================================
-  # 步驟 4: 部署與執行資料庫初始化 Job (Cloud Run Job)
-  # ==============================================================================
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Deploy and Run DB Init Job'
-    waitFor:
-      - 'Deploy to Cloud Run Service'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "Deploying Cloud Run Job: ${_DEPLOY_JOB_NAME}"
-        
-        # 部署/更新 Job 配置
-        gcloud run jobs deploy ${_DEPLOY_JOB_NAME} \
-          --image ${_IMAGE_PATH}:${SHORT_SHA} \
-          --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
-          --project "${_DEPLOY_PROJECT_ID}" \
-          --region ${_LOCATION} \
-          --command "python" \
-          --args "init_db.py" \
-          --network "${_VPC_NETWORK}" \
-          --subnet "${_VPC_SUBNET}" \
-          --vpc-egress "all-traffic" \
-          --set-env-vars "FLASK_ENV=production,SKIP_SAMPLE_DATA=true" \
-          --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest" \
-          --max-retries 0
-          
-        echo "Executing Cloud Run Job..."
-        # 執行 Job (同步等待直到完成)
-        gcloud run jobs execute ${_DEPLOY_JOB_NAME} \
-          --project "${_DEPLOY_PROJECT_ID}" \
-          --region ${_LOCATION} \
-          --wait
+
 
   # ==============================================================================
   # 步驟 5: 部署 Oracle AIMS 同步 Job (motor-oracle-sync)
