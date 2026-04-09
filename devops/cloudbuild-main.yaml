@@ -155,7 +155,6 @@ steps:
         echo "=== [3b] 診斷完成，請依據上方 3 個測試的結果判斷問題根因 ==="
 
 
-
   # ==============================================================================
   # 步驟 3c: 診斷 - 確認 Secret Manager 存取 (prj-ai-intellipatrol-ip 內的 secrets)
   # 失敗表示 → 部署 SA 缺少 secretmanager.versions.access 權限
