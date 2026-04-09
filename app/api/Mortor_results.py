@@ -11,6 +11,7 @@ from app.utils.decorators import validate_json, log_request
 from app.utils.validators import Validator
 from app.utils.file_helpers import save_base64_image, save_uploaded_file
 from datetime import datetime
+from app.utils.inspection_status import InspectionStatus
 
 results_bp = Blueprint('results', __name__)
 
@@ -146,8 +147,8 @@ def upload_results(**kwargs):
                 )
                 db.session.add(result)
             
-            # Create abnormal tracking if is_out_of_spec >= 2 (異常 or 停機)
-            if result.is_out_of_spec and result.is_out_of_spec >= 2:
+            # 建立異常追蹤：is_out_of_spec >= ABNORMAL (異常)或 >= SHUTDOWN (停機)
+            if result.is_out_of_spec and result.is_out_of_spec >= InspectionStatus.ABNORMAL:
                 tracking = AbnormalCases.query.filter_by(
                     actid=actid,
                     equipmentid=task.equipmentid,  # P1-B: 補 equipmentid 以對齊三欄複合主鍵
