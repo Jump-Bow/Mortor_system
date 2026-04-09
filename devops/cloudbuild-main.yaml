@@ -133,23 +133,23 @@ steps:
         echo "--- [3b-3] 測試: 直接查詢 AR REST API 確認回應碼 ---"
         echo "[3b-3] 呼叫: GET artifactregistry.googleapis.com/v1/projects/cmc-devops/..."
         IMAGE_REPO=$(echo "${_IMAGE_PATH}" | sed 's|asia-east1-docker.pkg.dev/cmc-devops/||')
-        TOKEN=$(gcloud auth print-access-token 2>/dev/null)
-        HTTP_CODE=$(curl -s -o /tmp/ar_response.json -w "%{http_code}" \
-          -H "Authorization: Bearer ${TOKEN}" \
+        TOKEN=$$(gcloud auth print-access-token 2>/dev/null)
+        HTTP_CODE=$$(curl -s -o /tmp/ar_response.json -w "%{http_code}" \
+          -H "Authorization: Bearer $$TOKEN" \
           "https://artifactregistry.googleapis.com/v1/projects/cmc-devops/locations/asia-east1/repositories/pd-repo/dockerImages" \
           2>/dev/null)
-        echo "[3b-3] HTTP 回應碼: ${HTTP_CODE}"
+        echo "[3b-3] HTTP 回應碼: $$HTTP_CODE"
         cat /tmp/ar_response.json 2>/dev/null | head -20 || true
-        if [ "${HTTP_CODE}" = "200" ]; then
+        if [ "$$HTTP_CODE" = "200" ]; then
           echo "[3b-3] ✅ REST API 存取成功 (200)"
-        elif [ "${HTTP_CODE}" = "403" ]; then
-          DENY_MSG=$(cat /tmp/ar_response.json 2>/dev/null | grep -o '"message":"[^"]*"' | head -1)
+        elif [ "$$HTTP_CODE" = "403" ]; then
+          DENY_MSG=$$(cat /tmp/ar_response.json 2>/dev/null | grep -o '"message":"[^"]*"' | head -1)
           echo "[3b-3] ❌ 403 Forbidden — 被 IAM 或 VPC-SC 拒絕"
-          echo "[3b-3] 伺服器訊息: ${DENY_MSG}"
+          echo "[3b-3] 伺服器訊息: $$DENY_MSG"
           echo "[3b-3] 若訊息含 'VPC Service Controls' → 確認是 VPC-SC Perimeter 問題"
           echo "[3b-3] 若訊息含 'Permission denied' → 確認是 IAM 角色問題"
         else
-          echo "[3b-3] ⚠️  異常回應碼: ${HTTP_CODE}"
+          echo "[3b-3] ⚠️  異常回應碼: $$HTTP_CODE"
         fi
         echo ""
         echo "=== [3b] 診斷完成，請依據上方 3 個測試的結果判斷問題根因 ==="
