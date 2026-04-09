@@ -133,27 +133,26 @@ steps:
         echo "--- [3b-3] 測試: 直接查詢 AR REST API 確認回應碼 ---"
         echo "[3b-3] 呼叫: GET artifactregistry.googleapis.com/v1/projects/cmc-devops/..."
         IMAGE_REPO=$(echo "${_IMAGE_PATH}" | sed 's|asia-east1-docker.pkg.dev/cmc-devops/||')
-        TOKEN=$$(gcloud auth print-access-token 2>/dev/null)
-        HTTP_CODE=$$(curl -s -o /tmp/ar_response.json -w "%{http_code}" \
-          -H "Authorization: Bearer $$TOKEN" \
+        TOKEN=$(gcloud auth print-access-token 2>/dev/null)
+        HTTP_CODE=$(curl -s -o /tmp/ar_response.json -w "%{http_code}" \
+          -H "Authorization: Bearer ${TOKEN}" \
           "https://artifactregistry.googleapis.com/v1/projects/cmc-devops/locations/asia-east1/repositories/pd-repo/dockerImages" \
           2>/dev/null)
-        echo "[3b-3] HTTP 回應碼: $$HTTP_CODE"
+        echo "[3b-3] HTTP 回應碼: ${HTTP_CODE}"
         cat /tmp/ar_response.json 2>/dev/null | head -20 || true
-        if [ "$$HTTP_CODE" = "200" ]; then
+        if [ "${HTTP_CODE}" = "200" ]; then
           echo "[3b-3] ✅ REST API 存取成功 (200)"
-        elif [ "$$HTTP_CODE" = "403" ]; then
-          DENY_MSG=$$(cat /tmp/ar_response.json 2>/dev/null | grep -o '"message":"[^"]*"' | head -1)
+        elif [ "${HTTP_CODE}" = "403" ]; then
+          DENY_MSG=$(cat /tmp/ar_response.json 2>/dev/null | grep -o '"message":"[^"]*"' | head -1)
           echo "[3b-3] ❌ 403 Forbidden — 被 IAM 或 VPC-SC 拒絕"
-          echo "[3b-3] 伺服器訊息: $$DENY_MSG"
+          echo "[3b-3] 伺服器訊息: ${DENY_MSG}"
           echo "[3b-3] 若訊息含 'VPC Service Controls' → 確認是 VPC-SC Perimeter 問題"
           echo "[3b-3] 若訊息含 'Permission denied' → 確認是 IAM 角色問題"
         else
-          echo "[3b-3] ⚠️  異常回應碼: $$HTTP_CODE"
+          echo "[3b-3] ⚠️  異常回應碼: ${HTTP_CODE}"
         fi
         echo ""
         echo "=== [3b] 診斷完成，請依據上方 3 個測試的結果判斷問題根因 ==="
-
 
 
   # ==============================================================================
@@ -219,7 +218,7 @@ steps:
           --execution-environment "gen2" \
           --network "${_VPC_NETWORK}" \
           --subnet "${_VPC_SUBNET}" \
-          --vpc-egress "private-ranges-only" \
+          --vpc-egress "all-traffic" \
           --set-env-vars "FLASK_ENV=production,USE_AZURE_AD=true" \
           --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest,AZURE_CLIENT_ID=FM_AZURE_CLIENT_ID:latest,AZURE_CLIENT_SECRET=FM_AZURE_CLIENT_SECRET:latest,AZURE_TENANT_ID=FM_AZURE_TENANT_ID:latest,AZURE_REDIRECT_URI=FM_AZURE_REDIRECT_URI:latest" \
           --allow-unauthenticated \
@@ -264,9 +263,7 @@ substitutions:
   # 自動組合完整的網路與子網路路徑
   _VPC_NETWORK: 'projects/${_HOST_PROJECT_ID}/global/networks/${_SHARED_VPC_NAME}'
   _VPC_SUBNET: 'projects/${_HOST_PROJECT_ID}/regions/${_LOCATION}/subnetworks/${_SHARED_SUBNET_NAME}'
-  # --- 【映像檔來源設定】---
-  # Image 依公司政策存放於 cmc-devops AR，Cloud Build SA 有推送權限
-  # vpc-egress 已改為 private-ranges-only，Cloud Run manifest 驗證走 Google 內網不被 VPC-SC 攔截
+  # --- 【映像檔來源設定 (由於先前權限與 IT 設定，退回原 cmc-devops 位置)】 ---
   _IMAGE_PATH: asia-east1-docker.pkg.dev/cmc-devops/pd-repo/ai-motor-server-image
 
 # 已移除 availableSecrets 區塊
