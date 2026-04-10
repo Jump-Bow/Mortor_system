@@ -11,12 +11,15 @@ steps:
     entrypoint: 'sh'
     args:
       - '-c'
-      - >
+      - |
+        echo "=== [1] 開始建置 Docker Image ==="
+        echo "[1] 時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        echo "[1] Image: ${_IMAGE_PATH}:${SHORT_SHA}"
         docker build -t ${_IMAGE_PATH}:${SHORT_SHA} .
+        echo "[1] ✅ Image 建置完成"
 
   # ==============================================================================
-  # 步驟 2: 推送 Image
-  # 將 Image 推送到 prj-ai-intellipatrol-ip 的 Artifact Registry（同專案，避免 VPC SC）
+  # 步驟 2: 推送 Image 到 Artifact Registry (cmc-devops)
   # ==============================================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Push image'
@@ -26,10 +29,15 @@ steps:
     args:
       - '-c'
       - |
+        echo "=== [2] 推送 Image 至 Artifact Registry ==="
+        echo "[2] 時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        echo "[2] 目標: ${_IMAGE_PATH}:${SHORT_SHA}"
         docker push ${_IMAGE_PATH}:${SHORT_SHA}
+        echo "[2] ✅ Image 推送完成"
 
   # ==============================================================================
-  # 步驟 3: 部署到 Cloud Run Service
+  # 步驟 3: 部署到 Cloud Run Service (motor-server)
+  # Secret 由 Cloud Run 本身的 SA 在執行時讀取，Cloud Build 不需要 SM 權限
   # ==============================================================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy to Cloud Run Service'
@@ -39,6 +47,11 @@ steps:
     args:
       - '-c'
       - |
+        echo "=== [3] 部署 Cloud Run Service: ${_DEPLOY_SERVICE_NAME} ==="
+        echo "[3] 時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        echo "[3] Image: ${_IMAGE_PATH}:${SHORT_SHA}"
+        echo "[3] 目標專案: ${_DEPLOY_PROJECT_ID}"
+        echo "[3] 執行 gcloud run deploy..."
         gcloud run deploy ${_DEPLOY_SERVICE_NAME} \
           --image ${_IMAGE_PATH}:${SHORT_SHA} \
           --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
@@ -52,9 +65,10 @@ steps:
           --set-env-vars "FLASK_ENV=production,USE_AZURE_AD=true" \
           --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest,AZURE_CLIENT_ID=FM_AZURE_CLIENT_ID:latest,AZURE_CLIENT_SECRET=FM_AZURE_CLIENT_SECRET:latest,AZURE_TENANT_ID=FM_AZURE_TENANT_ID:latest,AZURE_REDIRECT_URI=FM_AZURE_REDIRECT_URI:latest" \
           --allow-unauthenticated
+        echo "[3] ✅ motor-server 部署完成"
 
   # ==============================================================================
-  # 步驟 4: 部署與執行資料庫初始化 Job (Cloud Run Job)
+  # 步驟 4: 部署與執行資料庫初始化 Job (motor-db-init)
   # ==============================================================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy and Run DB Init Job'
@@ -64,9 +78,9 @@ steps:
     args:
       - '-c'
       - |
-        echo "Deploying Cloud Run Job: ${_DEPLOY_JOB_NAME}"
-
-        # 部署/更新 Job 配置
+        echo "=== [4] 部署 Cloud Run Job: ${_DEPLOY_JOB_NAME} ==="
+        echo "[4] 時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        echo "[4] Image: ${_IMAGE_PATH}:${SHORT_SHA}"
         gcloud run jobs deploy ${_DEPLOY_JOB_NAME} \
           --image ${_IMAGE_PATH}:${SHORT_SHA} \
           --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
@@ -80,17 +94,15 @@ steps:
           --set-env-vars "FLASK_ENV=production,SKIP_SAMPLE_DATA=true" \
           --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest" \
           --max-retries 0
-
-        echo "Executing Cloud Run Job..."
-        # 執行 Job (同步等待直到完成)
+        echo "[4] ✅ Job 部署完成，開始執行..."
         gcloud run jobs execute ${_DEPLOY_JOB_NAME} \
           --project "${_DEPLOY_PROJECT_ID}" \
           --region ${_LOCATION} \
           --wait
+        echo "[4] ✅ ${_DEPLOY_JOB_NAME} 執行完畢"
 
   # ==============================================================================
   # 步驟 5: 部署 Oracle AIMS 同步 Job (motor-oracle-sync)
-  # 執行 scripts/sync_oracle_data.py，以 Thick Mode 直連 AIMS Oracle 11.2g
   # ==============================================================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Oracle Sync Job'
@@ -100,7 +112,9 @@ steps:
     args:
       - '-c'
       - |
-        echo "=== Deploying Oracle Sync Cloud Run Job: motor-oracle-sync ==="
+        echo "=== [5] 部署 Oracle Sync Job: motor-oracle-sync ==="
+        echo "[5] 時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        echo "[5] Image: ${_IMAGE_PATH}:${SHORT_SHA}"
         gcloud run jobs deploy motor-oracle-sync \
           --image ${_IMAGE_PATH}:${SHORT_SHA} \
           --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
@@ -114,7 +128,7 @@ steps:
           --set-env-vars "FLASK_ENV=production" \
           --set-secrets "ORA_DB_USER=ORA_DB_USER:latest,ORA_DB_PASS=ORA_DB_PASS:latest,ORA_DB_SERVER=ORA_DB_SERVER:latest,ORA_DB_PORT=ORA_DB_PORT:latest,ORA_DB_SERVICE=ORA_DB_SERVICE:latest,PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest" \
           --max-retries 1
-        echo "=== Oracle Sync Job 部署完成（手動觸發執行請至 GCP Console）==="
+        echo "[5] ✅ motor-oracle-sync 部署完成（手動至 GCP Console 觸發執行）"
 
 # ==============================================================================
 # 設定與環境變數
@@ -137,5 +151,5 @@ substitutions:
   # 自動組合完整的網路與子網路路徑
   _VPC_NETWORK: 'projects/${_HOST_PROJECT_ID}/global/networks/${_SHARED_VPC_NAME}'
   _VPC_SUBNET: 'projects/${_HOST_PROJECT_ID}/regions/${_LOCATION}/subnetworks/${_SHARED_SUBNET_NAME}'
-  # --- 【映像檔來源設定：恢復原始 cmc-devops 設定】 ---
+  # --- 【映像檔來源設定】 ---
   _IMAGE_PATH: asia-east1-docker.pkg.dev/cmc-devops/pd-repo/ai-motor-server-image
