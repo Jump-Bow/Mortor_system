@@ -1,5 +1,5 @@
 # ==============================================================================
-# cloudbuild.yaml (最終版 - 無 Secret Manager 設定)
+# cloudbuild.yaml - 正式部署版
 # 部署至 Cloud Run，並透過 Direct VPC Egress 連接到 Shared VPC
 # ==============================================================================
 steps:
@@ -13,11 +13,10 @@ steps:
       - '-c'
       - >
         docker build -t ${_IMAGE_PATH}:${SHORT_SHA} .
-    # 已移除 secretEnv 區塊，因為不再從 Secret Manager 獲取密鑰
 
   # ==============================================================================
   # 步驟 2: 推送 Image
-  # 將 Image 推送到 cmc-devops 專案的 Artifact Registry
+  # 將 Image 推送到 prj-ai-intellipatrol-ip 的 Artifact Registry（同專案，避免 VPC SC）
   # ==============================================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Push image'
@@ -30,185 +29,16 @@ steps:
         docker push ${_IMAGE_PATH}:${SHORT_SHA}
 
   # ==============================================================================
-  # 步驟 3a: 診斷 - 確認 Cloud Build SA 身份與目標專案存取權限
-  # 失敗表示 → Cloud Build SA 本身無法存取 prj-ai-intellipatrol-ip
+  # 步驟 3: 部署到 Cloud Run Service
   # ==============================================================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Diag-3a: Verify SA Identity & Project Access'
+    id: 'Deploy to Cloud Run Service'
     waitFor:
       - 'Push image'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "=== [3a] Cloud Build SA 身份確認 ==="
-        echo "[3a] 執行時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-        echo "[3a] 當前 SA 身份:"
-        gcloud auth list
-        echo ""
-        echo "[3a] 嘗試列出目標專案 ${_DEPLOY_PROJECT_ID} 的 Cloud Run 服務..."
-        gcloud run services list \
-          --project "${_DEPLOY_PROJECT_ID}" \
-          --region "${_LOCATION}" \
-          --platform managed \
-          2>&1 && echo "[3a] ✅ 目標專案存取 OK" || {
-            echo "[3a] ❌ 無法存取目標專案 ${_DEPLOY_PROJECT_ID}"
-            echo "[3a] 可能原因: Cloud Build SA 缺少 roles/run.admin 於目標專案"
-            exit 1
-          }
-
-  # ==============================================================================
-  # 步驟 3b: 診斷 - VPC-SC 跨專案 Image 存取分層測試
-  # 【重點】測試 3 個不同 Principal 的存取能力，精確定位誰被擋
-  #
-  # 實際被 VPC-SC 擋的請求路徑:
-  #   Principal : intellipatrol-app-IP-sa (Cloud Run Runtime SA)
-  #   動作      : artifactregistry.googleapis.com → GetDockerImage (讀 manifest)
-  #   來源專案  : prj-ai-intellipatrol-ip
-  #   目標資源  : asia-east1-docker.pkg.dev/cmc-devops/pd-repo/...
-  # ==============================================================================
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Diag-3b: Verify Image Manifest Access (VPC-SC Check)'
-    waitFor:
-      - 'Diag-3a: Verify SA Identity & Project Access'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "=== [3b] Artifact Registry 跨專案存取分層診斷 ==="
-        echo "[3b] 執行時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-        echo "[3b] Image 路徑: ${_IMAGE_PATH}:${SHORT_SHA}"
-        echo "[3b] Image 所在專案: cmc-devops"
-        echo "[3b] 部署目標專案: ${_DEPLOY_PROJECT_ID}"
-        echo ""
-
-        # ------------------------------------------------------------------
-        # 測試 1/3: Cloud Build SA 本身能否讀取 Image manifest
-        # 被擋 → Cloud Build SA 在 cmc-devops AR 無 reader 角色
-        # ------------------------------------------------------------------
-        echo "--- [3b-1] 測試: Cloud Build SA 讀取 Image manifest ---"
-        echo "[3b-1] 呼叫 API: artifactregistry.googleapis.com → GetDockerImage"
-        echo "[3b-1] 執行身份: $(gcloud config get-value account 2>/dev/null)"
-        gcloud artifacts docker images describe \
-          "${_IMAGE_PATH}:${SHORT_SHA}" \
-          --project "cmc-devops" \
-          2>&1 \
-          && echo "[3b-1] ✅ Cloud Build SA 可讀取 manifest" \
-          || echo "[3b-1] ❌ Cloud Build SA 無法讀取 manifest (IAM 或 VPC-SC 阻擋)"
-        echo ""
-
-        # ------------------------------------------------------------------
-        # 測試 2/3: 模擬 Cloud Run Runtime SA 存取 Image manifest
-        # 【這才是 Cloud Run deploy 時的實際請求主體】
-        # 被擋 → Cloud Run SA 跨專案被 VPC-SC Perimeter 攔截
-        # ------------------------------------------------------------------
-        echo "--- [3b-2] 測試: 模擬 Cloud Run SA 讀取 Image manifest ---"
-        echo "[3b-2] 呼叫 API: artifactregistry.googleapis.com → GetDockerImage"
-        echo "[3b-2] 執行身份 (impersonate): ${_DEPLOY_SERVICE_ACCOUNT}"
-        echo "[3b-2] *** 此身份與 Cloud Run ReplaceService 時使用的 SA 相同 ***"
-        gcloud artifacts docker images describe \
-          "${_IMAGE_PATH}:${SHORT_SHA}" \
-          --project "cmc-devops" \
-          --impersonate-service-account="${_DEPLOY_SERVICE_ACCOUNT}" \
-          2>&1 \
-          && echo "[3b-2] ✅ Cloud Run SA 可讀取 manifest，VPC-SC 不擋此路徑" \
-          || {
-            echo "[3b-2] ❌ Cloud Run SA 無法讀取 manifest"
-            echo "[3b-2] 被擋的請求明細:"
-            echo "[3b-2]   Principal : ${_DEPLOY_SERVICE_ACCOUNT}"
-            echo "[3b-2]   API       : artifactregistry.googleapis.com/GetDockerImage"
-            echo "[3b-2]   來源專案  : ${_DEPLOY_PROJECT_ID}"
-            echo "[3b-2]   目標資源  : ${_IMAGE_PATH}:${SHORT_SHA} (cmc-devops)"
-            echo "[3b-2] 修復方向:"
-            echo "[3b-2]   A. 將 cmc-devops 加入 prj-ai-intellipatrol-ip 的 VPC-SC Perimeter"
-            echo "[3b-2]   B. 或在 VPC-SC 設定 Access Policy 允許此跨專案存取"
-            echo "[3b-2]   C. 或將 Image 改存放在 prj-ai-intellipatrol-ip 自己的 AR"
-          }
-        echo ""
-
-        # ------------------------------------------------------------------
-        # 測試 3/3: 直接呼叫 Artifact Registry REST API 確認 HTTP 回應
-        # 可看到 403 (IAM) 或 VPC-SC 特有的 PERMISSION_DENIED 錯誤碼
-        # ------------------------------------------------------------------
-        echo "--- [3b-3] 測試: 直接查詢 AR REST API 確認回應碼 ---"
-        echo "[3b-3] 呼叫: GET artifactregistry.googleapis.com/v1/projects/cmc-devops/..."
-        IMAGE_REPO=$(echo "${_IMAGE_PATH}" | sed 's|asia-east1-docker.pkg.dev/cmc-devops/||')
-        TOKEN=$$(gcloud auth print-access-token 2>/dev/null)
-        HTTP_CODE=$$(curl -s -o /tmp/ar_response.json -w "%{http_code}" \
-          -H "Authorization: Bearer $$TOKEN" \
-          "https://artifactregistry.googleapis.com/v1/projects/cmc-devops/locations/asia-east1/repositories/pd-repo/dockerImages" \
-          2>/dev/null)
-        echo "[3b-3] HTTP 回應碼: $$HTTP_CODE"
-        cat /tmp/ar_response.json 2>/dev/null | head -20 || true
-        if [ "$$HTTP_CODE" = "200" ]; then
-          echo "[3b-3] ✅ REST API 存取成功 (200)"
-        elif [ "$$HTTP_CODE" = "403" ]; then
-          DENY_MSG=$$(cat /tmp/ar_response.json 2>/dev/null | grep -o '"message":"[^"]*"' | head -1)
-          echo "[3b-3] ❌ 403 Forbidden — 被 IAM 或 VPC-SC 拒絕"
-          echo "[3b-3] 伺服器訊息: $$DENY_MSG"
-          echo "[3b-3] 若訊息含 'VPC Service Controls' → 確認是 VPC-SC Perimeter 問題"
-          echo "[3b-3] 若訊息含 'Permission denied' → 確認是 IAM 角色問題"
-        else
-          echo "[3b-3] ⚠️  異常回應碼: $$HTTP_CODE"
-        fi
-        echo ""
-        echo "=== [3b] 診斷完成，請依據上方 3 個測試的結果判斷問題根因 ==="
-
-
-  # ==============================================================================
-  # 步驟 3c: 診斷 - 確認 Secret Manager 存取 (prj-ai-intellipatrol-ip 內的 secrets)
-  # 失敗表示 → 部署 SA 缺少 secretmanager.versions.access 權限
-  # ==============================================================================
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Diag-3c: Verify Secret Manager Access'
-    waitFor:
-      - 'Diag-3b: Verify Image Manifest Access (VPC-SC Check)'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "=== [3c] Secret Manager 存取確認 ==="
-        echo "[3c] 執行時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-        echo "[3c] 目標專案: ${_DEPLOY_PROJECT_ID}"
-        echo ""
-        echo "[3c] 列出目標專案的 Secrets (確認權限)..."
-        gcloud secrets list \
-          --project "${_DEPLOY_PROJECT_ID}" \
-          2>&1 && echo "[3c] ✅ Secret Manager 存取 OK" || {
-            echo "[3c] ❌ 無法存取 Secret Manager"
-            echo "[3c] 請確認 Cloud Build SA 有 roles/secretmanager.secretAccessor @ ${_DEPLOY_PROJECT_ID}"
-            exit 1
-          }
-        echo ""
-        echo "[3c] 嘗試讀取關鍵 Secret (FM_DB_SERVER) 確認存取版本..."
-        gcloud secrets versions access latest \
-          --secret="FM_DB_SERVER" \
-          --project "${_DEPLOY_PROJECT_ID}" \
-          2>&1 | head -c 5 | sed 's/./*/g'
-        echo " (已遮蔽) ✅" || {
-            echo "[3c] ❌ 無法讀取 Secret FM_DB_SERVER 的值"
-            exit 1
-          }
-
-  # ==============================================================================
-  # 步驟 3d: 實際部署 Cloud Run Service
-  # 若前三步皆綠，此步若仍失敗 → 問題在 Cloud Run Runtime 本身啟動環境
-  # ==============================================================================
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Deploy to Cloud Run Service'
-    waitFor:
-      - 'Diag-3c: Verify Secret Manager Access'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        set -e
-        echo "=== [3d] 正式部署 Cloud Run Service ==="
-        echo "[3d] 執行時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-        echo "[3d] Image: ${_IMAGE_PATH}:${SHORT_SHA}"
-        echo "[3d] 前三項診斷皆通過，開始執行 gcloud run deploy..."
-        echo ""
-
         gcloud run deploy ${_DEPLOY_SERVICE_NAME} \
           --image ${_IMAGE_PATH}:${SHORT_SHA} \
           --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
@@ -221,29 +51,73 @@ steps:
           --vpc-egress "all-traffic" \
           --set-env-vars "FLASK_ENV=production,USE_AZURE_AD=true" \
           --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest,AZURE_CLIENT_ID=FM_AZURE_CLIENT_ID:latest,AZURE_CLIENT_SECRET=FM_AZURE_CLIENT_SECRET:latest,AZURE_TENANT_ID=FM_AZURE_TENANT_ID:latest,AZURE_REDIRECT_URI=FM_AZURE_REDIRECT_URI:latest" \
-          --allow-unauthenticated \
-          2>&1 && {
-            echo ""
-            echo "[3d] ✅ 部署成功！"
-            echo "[3d] 完成時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-          } || {
-            echo ""
-            echo "[3d] ❌ gcloud run deploy 失敗"
-            echo "[3d] 失敗時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-            echo "[3d] 此步失敗但診斷 3a/3b/3c 皆通過，問題在 Cloud Run Revision 啟動階段"
-            echo "[3d] 建議至 GCP Console → Cloud Run → motor-server → 最新版本 → 日誌 查看容器啟動錯誤"
-            exit 1
-          }
+          --allow-unauthenticated
 
-  # 診斷步驟說明（各步對應的問題點）:
-  # Diag-3a 失敗 → Cloud Build SA 缺少目標專案 IAM 權限
-  # Diag-3b 失敗 → VPC-SC 阻擋跨專案 Image 存取（本次錯誤主因）
-  # Diag-3c 失敗 → Secret Manager 存取被拒
-  # Deploy  失敗 → Cloud Run Runtime/容器本身啟動問題
+  # ==============================================================================
+  # 步驟 4: 部署與執行資料庫初始化 Job (Cloud Run Job)
+  # ==============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy and Run DB Init Job'
+    waitFor:
+      - 'Deploy to Cloud Run Service'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Deploying Cloud Run Job: ${_DEPLOY_JOB_NAME}"
 
+        # 部署/更新 Job 配置
+        gcloud run jobs deploy ${_DEPLOY_JOB_NAME} \
+          --image ${_IMAGE_PATH}:${SHORT_SHA} \
+          --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
+          --project "${_DEPLOY_PROJECT_ID}" \
+          --region ${_LOCATION} \
+          --command "python" \
+          --args "init_db.py" \
+          --network "${_VPC_NETWORK}" \
+          --subnet "${_VPC_SUBNET}" \
+          --vpc-egress "all-traffic" \
+          --set-env-vars "FLASK_ENV=production,SKIP_SAMPLE_DATA=true" \
+          --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest" \
+          --max-retries 0
 
+        echo "Executing Cloud Run Job..."
+        # 執行 Job (同步等待直到完成)
+        gcloud run jobs execute ${_DEPLOY_JOB_NAME} \
+          --project "${_DEPLOY_PROJECT_ID}" \
+          --region ${_LOCATION} \
+          --wait
 
+  # ==============================================================================
+  # 步驟 5: 部署 Oracle AIMS 同步 Job (motor-oracle-sync)
+  # 執行 scripts/sync_oracle_data.py，以 Thick Mode 直連 AIMS Oracle 11.2g
+  # ==============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Oracle Sync Job'
+    waitFor:
+      - 'Push image'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== Deploying Oracle Sync Cloud Run Job: motor-oracle-sync ==="
+        gcloud run jobs deploy motor-oracle-sync \
+          --image ${_IMAGE_PATH}:${SHORT_SHA} \
+          --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
+          --project "${_DEPLOY_PROJECT_ID}" \
+          --region ${_LOCATION} \
+          --command "python" \
+          --args "scripts/sync_oracle_data.py" \
+          --network "${_VPC_NETWORK}" \
+          --subnet "${_VPC_SUBNET}" \
+          --vpc-egress "all-traffic" \
+          --set-env-vars "FLASK_ENV=production" \
+          --set-secrets "ORA_DB_USER=ORA_DB_USER:latest,ORA_DB_PASS=ORA_DB_PASS:latest,ORA_DB_SERVER=ORA_DB_SERVER:latest,ORA_DB_PORT=ORA_DB_PORT:latest,ORA_DB_SERVICE=ORA_DB_SERVICE:latest,PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest" \
+          --max-retries 1
+        echo "=== Oracle Sync Job 部署完成（手動觸發執行請至 GCP Console）==="
 
+# ==============================================================================
+# 設定與環境變數
 # ==============================================================================
 timeout: 7200s
 
@@ -263,8 +137,5 @@ substitutions:
   # 自動組合完整的網路與子網路路徑
   _VPC_NETWORK: 'projects/${_HOST_PROJECT_ID}/global/networks/${_SHARED_VPC_NAME}'
   _VPC_SUBNET: 'projects/${_HOST_PROJECT_ID}/regions/${_LOCATION}/subnetworks/${_SHARED_SUBNET_NAME}'
-  # --- 【映像檔來源設定 (由於先前權限與 IT 設定，退回原 cmc-devops 位置)】 ---
-  _IMAGE_PATH: asia-east1-docker.pkg.dev/cmc-devops/pd-repo/ai-motor-server-image
-
-# 已移除 availableSecrets 區塊
-
+  # --- 【映像檔來源設定：同專案儲存，避開 VPC SC 跨專案限制】 ---
+  _IMAGE_PATH: asia-east1-docker.pkg.dev/prj-ai-intellipatrol-ip/pd-repo/ai-motor-server-image
