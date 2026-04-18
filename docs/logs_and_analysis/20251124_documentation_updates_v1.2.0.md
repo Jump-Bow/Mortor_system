@@ -1,3 +1,8 @@
+---
+type: log
+audience: developers
+date: 2025-11-24
+---
 # 資料庫規格文件更新記錄 (Documentation Updates v1.2.0)
 
 **日期**: 2025-11-24  

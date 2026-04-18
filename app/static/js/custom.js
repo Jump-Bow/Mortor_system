@@ -1,5 +1,5 @@
 /**
- * Custom JavaScript for FEM Admin System
+ * Custom JavaScript for 設備保養管理系統
  */
 
 // Global variables
@@ -541,7 +541,7 @@ function updateNotificationCount(count) {
 }
 
 // Export functions to global scope
-window.FEM = {
+window.App = {
     showLoading,
     hideLoading,
     formatDate,

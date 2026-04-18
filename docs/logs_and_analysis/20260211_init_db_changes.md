@@ -1,3 +1,8 @@
+---
+type: analysis
+audience: developers
+date: 2026-02-11
+---
 # init_db.py 更新說明
 
 ## 更新日期

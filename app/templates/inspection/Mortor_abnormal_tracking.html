@@ -1,6 +1,6 @@
-{% extends "layout/Mortor_base.html" %}
+﻿{% extends "layout/Mortor_base.html" %}
 
-{% block title %}異常追蹤管理 - FEM 設備保養管理系統{% endblock %}
+{% block title %}異常追蹤管理 - 設備保養管理系統{% endblock %}
 {% block page_title %}異常追蹤管理{% endblock %}
 {% block breadcrumb_active %}異常追蹤管理{% endblock %}
 
@@ -107,16 +107,14 @@
                 <input type="date" class="form-control" id="end-date" name="end_date">
               </div>
             </div>
-            <div class="col-md-3 d-flex align-items-end">
+            <div class="col-md-2 d-flex align-items-end">
               <div class="form-group mb-0">
                 <button type="button" class="btn btn-secondary mr-1" onclick="resetFilters()">
                   <i class="fas fa-redo"></i> 重置
                 </button>
-                <button type="button" class="btn btn-success" onclick="exportTracking()">
-                  <i class="fas fa-file-export"></i> 匯出
-                </button>
               </div>
             </div>
+
           </div>
         </form>
       </div>
@@ -499,9 +497,6 @@ function saveItemSolution(actid, item_id, btn) {
   });
 }
 
-function exportTracking() {
-  toastr.info('匯出功能開發中');
-}
 /* ===== 單張工單報表下載 ===== */
 function exportActReport(actid) {
   const token = localStorage.getItem('token');

@@ -12,6 +12,8 @@ from app.utils.validators import Validator
 from app.utils.file_helpers import save_base64_image, save_uploaded_file
 from datetime import datetime
 from app.utils.inspection_status import InspectionStatus
+# P1: 引入 PostgreSQL 方言的原子 UPSERT，取代 Check-Then-Insert 模式
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 results_bp = Blueprint('results', __name__)
 
@@ -36,8 +38,9 @@ def upload_results(**kwargs):
             - photo_data: Base64 照片 (可選)
     
     Response:
-        - uploaded_count: 成功上傳數量
-        - failed_count: 失敗數量
+        - uploaded_count: 成功上傳數量（新建立 或 LWW 判定為有效覆蓋）
+        - conflict_count: 衝突跳過數量（LWW 判定：App 送來的資料比 DB 舊，合理跳過）
+        - failed_count: 失敗數量（系統/驗證錯誤，App 應下次重試）
     """
     current_user = kwargs.get('current_user')
     data = request.get_json()
@@ -62,21 +65,23 @@ def upload_results(**kwargs):
         }), 404
     
     uploaded_count = 0
+    conflict_count = 0  # P2: LWW 跳過（資料太舊），App 應標記 is_synced=1，不需重試
     failed_count = 0
     errors = []
+    conflicts = []  # P2: 記錄被跳過的 item_id 與原因，回傳給 App 以利 debug
     
     for idx, result_data in enumerate(results):
         try:
-            # Validate required fields for each result
+            # 驗證每筆必要欄位
             required_fields = ['item_id', 'measured_value', 'act_time', 'act_mem_id']
             
             error = Validator.validate_required_fields(result_data, required_fields)
             if error:
-                errors.append({'index': idx, 'reason': error})
+                errors.append({'index': idx, 'item_id': result_data.get('item_id'), 'reason': error})
                 failed_count += 1
                 continue
             
-            # Validate act_time format
+            # 解析 act_time
             acttime_str = result_data['act_time']
             acttime = None
             
@@ -95,11 +100,11 @@ def upload_results(**kwargs):
                     continue
             
             if not acttime:
-                errors.append({'index': idx, 'reason': '檢查時間格式錯誤'})
+                errors.append({'index': idx, 'item_id': result_data.get('item_id'), 'reason': '檢查時間格式錯誤'})
                 failed_count += 1
                 continue
             
-            # Handle photo
+            # 處理照片
             result_photo = result_data.get('result_photo')
             if 'photo_data' in result_data:
                 success, saved_path = save_base64_image(
@@ -109,115 +114,128 @@ def upload_results(**kwargs):
                 if success:
                     result_photo = saved_path
             
-            # P0-2：用 savepoint 讓每筆獨立事務，避免單筆失敗 rollback 沙染前面已成功的資料
-            # 先查詢 DB 是否已有此紀錄（savepoint 前查詢，避免 dirty read）
-            result = InspectionResult.query.filter_by(
+            item_id = result_data['item_id']
+            is_out_of_spec = result_data.get('is_out_of_spec', 0)
+
+            # ─────────────────────────────────────────────────────────
+            # P1: PostgreSQL 原子 UPSERT（取代 Check-Then-Insert）
+            # 用 ON CONFLICT DO UPDATE 搭配 LWW 條件（新時間 > 舊時間才覆蓋）
+            # 即使兩個 Flask worker 同時進入此段，DB 層也能保證原子性，
+            # 不會發生 Race Condition 或主鍵衝突的 IntegrityError。
+            # ─────────────────────────────────────────────────────────
+            stmt = pg_insert(InspectionResult).values(
                 actid=actid,
-                equipmentid=task.equipmentid,  # P1-A: 補 equipmentid 以對齊三欄複合主鍵
-                item_id=result_data['item_id']
-            ).first()
+                equipmentid=task.equipmentid,
+                item_id=item_id,
+                measured_value=result_data['measured_value'],
+                act_mem_id=result_data['act_mem_id'],
+                act_time=acttime,
+                is_out_of_spec=is_out_of_spec,
+                result_photo=result_photo
+            )
 
-            db.session.begin_nested()  # savepoint
+            # 僅當新資料的 act_time 嚴格大於 DB 中現有的 act_time 才執行覆蓋（LWW）
+            # 若條件不成立（資料太舊或相同），PostgreSQL 不執行任何 UPDATE，
+            # 並透過 returning() 讓我們知道哪些欄位沒有被更新（xmax=0 表示未更新）
+            upsert_stmt = stmt.on_conflict_do_update(
+                index_elements=['actid', 'equipmentid', 'item_id'],
+                set_=dict(
+                    measured_value=stmt.excluded.measured_value,
+                    act_mem_id=stmt.excluded.act_mem_id,
+                    act_time=stmt.excluded.act_time,
+                    is_out_of_spec=stmt.excluded.is_out_of_spec,
+                    result_photo=stmt.excluded.result_photo,
+                ),
+                # P1 LWW 核心：只有新資料時間更新才覆蓋
+                where=(stmt.excluded.act_time > InspectionResult.act_time)
+            ).returning(InspectionResult.act_time, InspectionResult.actid)
 
-            # P0-3：LWW — 若 DB 已有相同或較新的紀錄，視為安全重試，跳過不覆蓋
-            if result:
-                if result.act_time and acttime and result.act_time >= acttime:
-                    db.session.rollback()  # release savepoint
-                    uploaded_count += 1   # 視為成功（重試）
-                    continue
-                # 更新（新量測時間 > DB 時間，合法覆蓋）
-                result.measured_value = result_data['measured_value']
-                result.is_out_of_spec = result_data.get('is_out_of_spec', 0)
-                result.act_time = acttime
-                result.act_mem_id = result_data['act_mem_id']
-                result.equipmentid = task.equipmentid
-                if result_photo:
-                    result.result_photo = result_photo
+            result_row = db.session.execute(upsert_stmt)
+            returned = result_row.fetchone()
+
+            # ─────────────────────────────────────────────────────────
+            # P2: 語意判斷 — UPSERT 是否真的執行了寫入（新建或覆蓋）？
+            # returned 有值 → 資料被寫入（新建 or 覆蓋）→ uploaded_count
+            # returned 無值 → DB 端 LWW 條件不成立（舊資料），靜默跳過 → conflict_count
+            # ─────────────────────────────────────────────────────────
+            if returned is not None:
+                uploaded_count += 1
             else:
-                # Create
-                result = InspectionResult(
-                    actid=actid,
-                    item_id=result_data['item_id'],
-                    equipmentid=task.equipmentid,
-                    measured_value=result_data['measured_value'],
-                    act_mem_id=result_data['act_mem_id'],
-                    act_time=acttime,
-                    is_out_of_spec=result_data.get('is_out_of_spec', 0),
-                    result_photo=result_photo
-                )
-                db.session.add(result)
-            
-            # 建立異常追蹤：is_out_of_spec >= ABNORMAL (異常)或 >= SHUTDOWN (停機)
-            if result.is_out_of_spec and result.is_out_of_spec >= InspectionStatus.ABNORMAL:
+                # DB 認為現有資料比傳入的更新，合理跳過
+                conflict_count += 1
+                conflicts.append({
+                    'item_id': item_id,
+                    'reason': 'DB 已有更新資料（LWW 跳過）'
+                })
+
+            # 異常追蹤：is_out_of_spec >= ABNORMAL，確保 AbnormalCases 存在
+            if is_out_of_spec and is_out_of_spec >= InspectionStatus.ABNORMAL:
                 tracking = AbnormalCases.query.filter_by(
                     actid=actid,
-                    equipmentid=task.equipmentid,  # P1-B: 補 equipmentid 以對齊三欄複合主鍵
-                    item_id=result_data['item_id']
+                    equipmentid=task.equipmentid,
+                    item_id=item_id
                 ).first()
                 
                 if not tracking:
                     tracking = AbnormalCases(
                         actid=actid,
                         equipmentid=task.equipmentid,
-                        item_id=result_data['item_id'],
+                        item_id=item_id,
                         measured_value=result_data['measured_value'],
                         is_processed=False,
-                        # P2-10：從 App payload 取異常原因，不再永遠空字串
                         abn_msg=result_data.get('abn_msg', '') or '',
                         abn_solution='',
                     )
                     db.session.add(tracking)
             
-            db.session.commit()  # commit savepoint
-            uploaded_count += 1
+            db.session.commit()
             
         except Exception as e:
-            current_app.logger.error(f'Error uploading result {idx}: {str(e)}')
-            errors.append({'index': idx, 'reason': str(e)})
+            db.session.rollback()
+            current_app.logger.error(f'Error uploading result idx={idx} item_id={result_data.get("item_id")}: {str(e)}')
+            errors.append({'index': idx, 'item_id': result_data.get('item_id'), 'reason': str(e)})
             failed_count += 1
-            db.session.rollback()  # rollback savepoint only
             continue
     
-    # P0-2：各筆已獨立 commit，最後一次 commit 確保 session 干淨
-    try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'Final commit error: {str(e)}')
-    
     current_app.logger.info(
-        f'User {current_user.id} uploaded {uploaded_count} results for task {actid}'
+        f'User {current_user.id} uploaded results for task {actid}: '
+        f'uploaded={uploaded_count}, conflict={conflict_count}, failed={failed_count}'
     )
     
-    # Determine response status
+    # ─────────────────────────────────────────────────────────────────
+    # P2: 回應語意設計
+    # - failed_count=0           → 200 success（含 conflict_count 資訊）
+    # - failed_count>0 但有成功  → 207 partial_success
+    # - 全部失敗                 → 400 error
+    # conflict_count 不算失敗，App 端收到後應將對應筆標記 is_synced=1
+    # ─────────────────────────────────────────────────────────────────
+    response_data = {
+        'uploaded_count': uploaded_count,
+        'conflict_count': conflict_count,
+        'failed_count': failed_count,
+    }
+    if conflicts:
+        response_data['conflicts'] = conflicts
+    if errors:
+        response_data['errors'] = errors
+
     if failed_count == 0:
         return jsonify({
             'status': 'success',
-            'message': '資料上傳完成',
-            'data': {
-                'uploaded_count': uploaded_count,
-                'failed_count': failed_count
-            }
+            'message': f'資料上傳完成（上傳 {uploaded_count} 筆，跳過舊資料 {conflict_count} 筆）',
+            'data': response_data
         }), 200
-    elif uploaded_count > 0:
+    elif uploaded_count > 0 or conflict_count > 0:
         return jsonify({
             'status': 'partial_success',
-            'message': '部分資料上傳失敗',
-            'data': {
-                'uploaded_count': uploaded_count,
-                'failed_count': failed_count,
-                'errors': errors
-            }
+            'message': f'部分資料上傳失敗（失敗 {failed_count} 筆）',
+            'data': response_data
         }), 207
     else:
         return jsonify({
             'status': 'error',
             'message': '所有資料上傳失敗',
-            'data': {
-                'uploaded_count': uploaded_count,
-                'failed_count': failed_count,
-                'errors': errors
-            }
+            'data': response_data
         }), 400
 
 

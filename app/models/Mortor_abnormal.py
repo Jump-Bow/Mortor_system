@@ -22,11 +22,11 @@ class AbnormalCases(db.Model):
     # Relationships
     responsible_user = db.relationship('HrAccount', foreign_keys=[processed_memid])
     
-    # Composite foreign key relationship to InspectionResult
+    # Composite foreign key relationship to InspectionResult (三欄複合 PK 完整對應)
     __table_args__ = (
         db.ForeignKeyConstraint(
-            ['actid', 'item_id'],
-            ['inspection_result.actid', 'inspection_result.item_id']
+            ['actid', 'equipmentid', 'item_id'],
+            ['inspection_result.actid', 'inspection_result.equipmentid', 'inspection_result.item_id']
         ),
     )
     

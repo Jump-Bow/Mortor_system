@@ -83,7 +83,7 @@ class InspectionResult(db.Model):
 
     actid = db.Column(db.String(48), db.ForeignKey('t_job.actid'), primary_key=True, comment='工單ID')
     item_id = db.Column(db.String(48), db.ForeignKey('equit_check_item.item_id'), primary_key=True, comment='項目ID')
-    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), comment='設備編號')
+    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), primary_key=True, comment='設備編號')
     measured_value = db.Column(db.String(48), comment='量測值')
     act_mem_id = db.Column(db.String(30), db.ForeignKey('hr_account.id'), comment='負責人ID')
     act_time = db.Column(db.DateTime, comment='量測時間')
