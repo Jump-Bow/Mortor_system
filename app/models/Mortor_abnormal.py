@@ -10,7 +10,7 @@ class AbnormalCases(db.Model):
     __tablename__ = 'abnormal_cases'
     
     actid = db.Column(db.String(48), db.ForeignKey('t_job.actid'), primary_key=True, comment='工單ID')
-    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), comment='設備編號')
+    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), primary_key=True, comment='設備編號')
     item_id = db.Column(db.String(48), db.ForeignKey('equit_check_item.item_id'), primary_key=True, comment='項目ID')
     measured_value = db.Column(db.String(48), comment='量測值')
     is_processed = db.Column(db.Boolean, default=False, index=True, comment='是否處理')  # dashboard 統計常用
