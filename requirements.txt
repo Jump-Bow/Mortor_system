@@ -36,6 +36,10 @@ Pillow==10.1.0
 python-dateutil==2.8.2
 pytz==2023.3
 
+# Oracle Integration (AIMS - Thick Mode, Oracle 11.2g compatible)
+oracledb==2.1.2
+pandas==2.1.4
+
 # HTTP Requests (for AIMS integration)
 requests==2.31.0
 
