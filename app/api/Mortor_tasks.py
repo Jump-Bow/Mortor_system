@@ -212,32 +212,37 @@ def list_tasks(**kwargs):
             f' assigned task {task.actid} and equipmentid {task.equipmentid}'
         )
         
-        # Get check items for this equipment
+        # Get check items — 對齊 download_tasks：依 grade/mterm 查通用表（非 equipment 綁定）
+        check_items_objs = EquitCheckItem.query.filter_by(
+            grade=task.grade,
+            mterm=task.mterm
+        ).order_by(EquitCheckItem.sort_order).all()
+
         check_items = []
-        if equipment:
-            for item in equipment.check_items.order_by(EquitCheckItem.item_id):
-                check_items.append({
-                    'item_id': item.item_id,
-                    'item_name': item.item_name,
-                    'item_desc': item.item_desc,
-                    'status_type': item.status_type,
-                    'max_v': item.max_v,
-                    'min_v': item.min_v,
-                    'sort_order': item.sort_order,
-                    'grade': item.grade,
-                    'mterm': item.mterm,
-                    'unit': item.unit,
-                    'data_type': '數值' if item.max_v or item.min_v else '文字',
-                    'is_required': True
-                })
-        
-        # Calculate completion rate
-        total_items = 0
+        for item in check_items_objs:
+            check_items.append({
+                'item_id': item.item_id,
+                'item_name': item.item_name,
+                'item_desc': item.item_desc,
+                'status_type': item.status_type,
+                'max_v': item.max_v,
+                'min_v': item.min_v,
+                'sort_order': item.sort_order,
+                'grade': item.grade,
+                'mterm': item.mterm,
+                'unit': item.unit,
+                'data_type': '數值' if item.max_v or item.min_v else '文字',
+                'is_required': True
+            })
+
+        # Calculate completion rate — 對齊 P1-7：排除 is_out_of_spec=0（未填寫紀錄）
+        total_items = len(check_items_objs)
         completed_items = 0
-        if task.equipment:
-            total_items = task.equipment.check_items.count()
         if total_items > 0:
-            completed_items = task.results.count()
+            from app.models.Mortor_inspection import InspectionResult
+            completed_items = task.results.filter(
+                InspectionResult.is_out_of_spec != InspectionStatus.CREATED
+            ).count()
             completion_rate = (completed_items / total_items) * 100
         else:
             completion_rate = 0

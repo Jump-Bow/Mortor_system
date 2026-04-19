@@ -1,6 +1,6 @@
-{% extends "layout/Mortor_base.html" %}
+﻿{% extends "layout/Mortor_base.html" %}
 
-{% block title %}AIMS工單執行進度查詢 - FEM 設備保養管理系統{% endblock %}
+{% block title %}AIMS工單執行進度查詢 - 設備保養管理系統{% endblock %}
 {% block page_title %}AIMS工單執行進度查詢{% endblock %}
 {% block breadcrumb_active %}AIMS工單執行進度查詢{% endblock %}
 
@@ -87,11 +87,6 @@
             <input type="text" id="filter-act-key" class="form-control" placeholder="輸入工單號碼...">
           </div>
         </div>
-        <div class="col-md-3 d-flex align-items-end">
-          <button type="button" id="btn-export" class="btn btn-success ml-0">
-            <i class="fas fa-file-download mr-1"></i>報表下載
-          </button>
-        </div>
       </div>
     </form>
   </div>
@@ -110,15 +105,15 @@
       <thead>
         <tr>
           <th style="width:40px">詳細</th>
-          <th style="width:40px">異常</th>
-          <th style="width:40px">下載</th>
+          <th style="width:40px">狀態</th>
           <th>工單號碼</th>
           <th>工單日期</th>
           <th>組織</th>
-          <th>設備名稱</th>
+          <th>工單說明</th>
           <th>馬達類別</th>
           <th>保養週期</th>
-          <th>狀態</th>
+          <th style="width:60px">設備數</th>
+          <th>執行狀態</th>
           <th>完成率</th>
           <th>負責人</th>
         </tr>
@@ -166,7 +161,7 @@
           <table class="table table-sm table-bordered table-hover">
             <thead class="thead-light">
               <tr>
-                <th style="width:30px">異常</th>
+                <th style="width:30px">狀態</th>
                 <th style="width:60px">圖片</th>
                 <th>檢查項目</th>
                 <th>量測值</th>
@@ -332,9 +327,11 @@ $(document).ready(function () {
     data: [],
     columns: [
       {
+        // 詳細按鈕：傳 act_key（工單號碼），展開該工單的所有設備
         data: null, orderable: false, className: 'text-center',
         render: function (d, t, row) {
-          return `<button class="btn btn-xs btn-outline-primary" onclick="showEquipment('${row.actid}')">
+          const safeKey = (row.act_key || '').replace(/'/g, "\\'")
+          return `<button class="btn btn-xs btn-outline-primary" onclick="showEquipment('${safeKey}')">
                     <i class="fas fa-search-plus"></i></button>`;
         }
       },
@@ -345,18 +342,22 @@ $(document).ready(function () {
                    : '<span class="badge badge-success"><i class="fas fa-check"></i></span>';
         }
       },
-      {
-        data: null, orderable: false, className: 'text-center',
-        render: function (d, t, row) {
-          return `<button class="btn btn-xs btn-outline-success" title="下載量測明細" onclick="exportActReport('${row.actid}')"><i class="fas fa-file-excel"></i></button>`;
-        }
-      },
       { data: 'act_key', defaultContent: '-' },
       { data: 'mdate', render: function (d) { return formatDate(d); } },
       { data: 'org_name', defaultContent: '-' },
-      { data: 'equipment_name', defaultContent: '-' },
+      {
+        // 工單說明：超過 25 字則截斷並顯示 tooltip
+        data: 'act_desc', defaultContent: '-',
+        render: function (d) {
+          if (!d) return '-';
+          return d.length > 25
+            ? `<span title="${d}">${d.substring(0, 25)}&hellip;</span>`
+            : d;
+        }
+      },
       { data: 'grade', defaultContent: '-' },
       { data: 'mterm', defaultContent: '-' },
+      { data: 'equipment_count', className: 'text-center', defaultContent: '0' },
       {
         data: 'status',
         render: function (d) { return getStatusBadge(d); }
@@ -372,15 +373,13 @@ $(document).ready(function () {
       { data: 'act_mem', defaultContent: '-' }
     ],
     language: { url: '/static/datatable_zh-Hant.json' },
-    order: [[3, 'desc']]
+    order: [[3, 'desc']]  // 工單日期降序
   });
 
   $('#search-form').on('submit', function (e) {
     e.preventDefault();
     searchAimsProgress();
   });
-
-  $('#btn-export').on('click', exportReport);
 });
 
 /* ===== 查詢 ===== */
@@ -411,31 +410,39 @@ function searchAimsProgress() {
   });
 }
 
-/* ===== 設備列表 Modal ===== */
-function showEquipment(actid) {
+/* ===== 設備列表 Modal（依 act_key 查詢該工單號碼下所有設備） ===== */
+function showEquipment(act_key) {
   const tbody = $('#equipment-tbody');
   tbody.html('<tr><td colspan="4" class="text-center"><i class="fas fa-spinner fa-spin"></i> 載入中...</td></tr>');
+  $('#modal-act-key').text(act_key);
+  $('#modal-act-desc').text('載入中...');
   $.ajax({
-    url: `/api/v1/aims/progress/${actid}`, method: 'GET',
+    url: `/api/v1/aims/progress/key/${encodeURIComponent(act_key)}`, method: 'GET',
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
     success: function (res) {
       if (res.status === 'success') {
-        const job = res.data.job;
-        $('#modal-act-key').text(job.act_key || actid);
-        $('#modal-act-desc').text(job.act_desc || '');
+        $('#modal-act-desc').text(res.data.act_desc || '');
         tbody.empty();
         const equipList = res.data.equipment_list || [];
         if (!equipList.length) {
           tbody.html('<tr><td colspan="4" class="text-center text-muted">無設備資料</td></tr>');
         } else {
           equipList.forEach(function (e) {
+            // e.actid 是該設備對應的 TJob actid，量測明細 API 需要
             tbody.append(`<tr>
               <td>${e.id}</td><td>${e.name}</td>
               <td>
                 <div class="progress progress-sm"><div class="progress-bar bg-info" style="width:${e.completion_rate}%"></div></div>
                 <small>${e.completion_rate}% (${e.completed_items}/${e.total_items})</small>
               </td>
-              <td><button class="btn btn-xs btn-outline-info" onclick="showMeasurements('${actid}','${e.id}','${e.name}')">
-                <i class="fas fa-ruler-combined"></i> 量測</button></td>
+              <td>
+                <button class="btn btn-xs btn-outline-info" onclick="showMeasurements('${e.actid}','${e.id}','${e.name}')">
+                  <i class="fas fa-ruler-combined"></i> 量測
+                </button>
+                <button class="btn btn-xs btn-outline-success ml-1" title="下載量測明細" onclick="exportActReport('${e.actid}')">
+                  <i class="fas fa-file-excel"></i>
+                </button>
+              </td>
             </tr>`);
           });
         }
@@ -561,20 +568,6 @@ function saveAbnSolutionAims() {
 /* ===== 工具函式 ===== */
 function showPhoto(src) { $('#photo-full').attr('src', src); $('#photoModal').modal('show'); }
 
-function exportReport() {
-  const params = new URLSearchParams();
-  const org = $('#aims-org-val').val();
-  const sd  = $('#filter-start-date').val();
-  const ed  = $('#filter-end-date').val();
-  const mt  = $('#filter-motor-type').val();
-  const mterm = $('#filter-mterm').val();
-  if (org)   params.append('org_id', org);
-  if (sd)    params.append('start_date', sd);
-  if (ed)    params.append('end_date', ed);
-  if (mt)    params.append('motor_type', mt);
-  if (mterm) params.append('mterm', mterm);
-  window.location.href = `/api/v1/aims/progress/export?${params.toString()}`;
-}
 
 function getStatusBadge(status) {
   const map = { '未派工': 'badge-secondary', '執行中': 'badge-info', '已完成': 'badge-success' };

@@ -1,3 +1,8 @@
+---
+type: log
+audience: developers
+date: 2026-04-09
+---
 # 架構改善紀錄 v1.3 (2026-04-09)
 ## 組織架構遷移、DSP Isolate、Delta Sync、InspectionStatus Enum
 
