@@ -1,6 +1,6 @@
 """
-AIMS Oracle 資料同步腳本 (厚模式 / Thick Mode)
-=================================================
+AIMS Oracle 資料同步腳本 (厚模式 / Thick Mode) — Production-Ready v2
+======================================================================
 從 AIMS Oracle 11.2g 資料庫直接撈取資料，同步至本地 PostgreSQL。
 
 依賴條件：
@@ -9,13 +9,22 @@ AIMS Oracle 資料同步腳本 (厚模式 / Thick Mode)
   - GCP Secret Manager 需有：ORA_DB_USER, ORA_DB_PASS,
                               ORA_DB_SERVER, ORA_DB_PORT, ORA_DB_SERVICE
 
-同步資料表（Oracle AIMS → PostgreSQL FEM）：
-  t_organization   → 設施組織資料
-  t_equipment      → 設備資料
-  hr_organization  → HR 組織資料
-  hr_account       → 人員帳號資料
-  t_job            → 巡檢工單（最近 90 天）
-  inspection_result→ 巡檢項目明細（初始化空值）
+同步資料表與策略（Oracle AIMS → PostgreSQL FEM）：
+  ┌──────────────────┬────────────────────────────────────────────────────┐
+  │ 資料表           │ 策略                                               │
+  ├──────────────────┼────────────────────────────────────────────────────┤
+  │ t_organization   │ SCD Type 1 Upsert（有則更新名稱/類型，無則新增）    │
+  │ t_equipment      │ SCD Type 1 Upsert（有則更新名稱/位置，無則新增）    │
+  │ hr_organization  │ SCD Type 1 Upsert                                  │
+  │ hr_account       │ SCD Type 1 Upsert                                  │
+  │ t_job            │ Insert-Only + 補齊 act_key/act_mem（不改量測紀錄） │
+  │ inspection_result│ 【不同步】— 量測結果僅由 App 巡檢員產生            │
+  └──────────────────┴────────────────────────────────────────────────────┘
+
+▶ 重要安全設計：
+  - 永不使用 TRUNCATE CASCADE（會連鎖刪除工單/量測/異常紀錄）
+  - 永不預建 inspection_result 佔位空行（會導致 App 正常值被 DO NOTHING 吞掉）
+  - 所有寫入採用 INSERT ... ON CONFLICT 的原子性 Upsert
 
 使用方式：
   python scripts/sync_oracle_data.py
@@ -30,6 +39,7 @@ from datetime import datetime, timedelta
 import oracledb
 import pandas as pd
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 # ── 路徑設定：讓 Flask app 可以被 import ── ────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -117,42 +127,108 @@ def get_postgres_engine() -> sa.Engine:
 
 
 # ==============================================================================
-# 2. 資料寫入（Upsert）
+# 2. 資料寫入（SCD Type 1 Upsert — 安全版）
 # ==============================================================================
 
-def upsert_dataframe(df: pd.DataFrame, table_name: str, engine: sa.Engine, constraint_cols: list) -> None:
-    """
-    將 DataFrame 寫入 PostgreSQL 資料表。
+# ──────────────────────────────────────────────────────────────────────────────
+# 資料表同步策略定義
+#
+# 設計原則（ISO 55000 / EAM 工業標準）：
+#   - 主檔（設備/組織/人員）：SCD Type 1 — 有則更新指定欄位，無則新增
+#   - 工單（t_job）：Insert-Only + 有限 Update（僅補齊 act_key / act_mem）
+#   - inspection_result / abnormal_cases：絕對不由此腳本操作
+#
+# 永遠不使用 TRUNCATE CASCADE 原因：
+#   TRUNCATE t_equipment CASCADE 會連鎖刪除：
+#     → t_job（所有工單）→ inspection_result（所有量測）→ abnormal_cases（所有異常單）
+#   這是不可逆的資料災難，且不符合 ISO 55000 可追溯性要求。
+# ──────────────────────────────────────────────────────────────────────────────
 
-    策略：
-    - 主參考資料表（org / equip / hr 等）使用 TRUNCATE + INSERT（全量覆寫）
-    - 交易式資料表（t_job / inspection_result）使用 ON CONFLICT DO NOTHING（增量）
+# 各資料表的 Upsert 設定：
+#   key   = 衝突判斷的主鍵欄位
+#   update = 發生衝突時要更新的欄位（不在此清單的欄位一律維持現有值）
+TABLE_UPSERT_CONFIG = {
+    "t_organization": {
+        "key": ["unitid"],
+        "update": ["parentunitid", "unitname", "unittype"],
+    },
+    "t_equipment": {
+        "key": ["id"],
+        "update": ["name", "assetid", "unitid"],
+    },
+    "hr_organization": {
+        "key": ["id"],
+        "update": ["parentid", "name"],
+    },
+    "hr_account": {
+        "key": ["id"],
+        "update": ["name", "organizationid", "email"],
+    },
+    "t_job": {
+        "key": ["actid"],
+        # 工單一旦存在，僅補齊可能在 AIMS 側更新的欄位
+        # 絕對不更新 equipmentid / mdate（App 端量測結果依賴此關聯）
+        "update": ["act_key", "act_mem"],
+    },
+}
+
+
+def upsert_dataframe(df: pd.DataFrame, table_name: str, engine: sa.Engine) -> None:
+    """
+    將 DataFrame 以 SCD Type 1 策略寫入 PostgreSQL。
+
+    策略：INSERT ... ON CONFLICT (key) DO UPDATE SET (update_cols)
+         只更新有差異的欄位（IS DISTINCT FROM），避免無意義的 Write Amplification。
+
+    Args:
+        df         : 要寫入的 DataFrame
+        table_name : 目標 PostgreSQL 資料表名稱
+        engine     : SQLAlchemy Engine
     """
     if df.empty:
         logger.warning(f"  ⚠️  {table_name}: DataFrame 為空，跳過寫入")
         return
 
-    FULL_OVERWRITE_TABLES = {"t_organization", "t_equipment", "hr_organization", "hr_account"}
+    config = TABLE_UPSERT_CONFIG.get(table_name)
+    if not config:
+        logger.error(f"  ❌ {table_name}: 未定義 Upsert 設定，拒絕寫入（安全防護）")
+        return
+
+    key_cols    = config["key"]
+    update_cols = config["update"]
+
+    # 只保留資料表定義中相關的欄位，避免 DataFrame 有多餘欄位出錯
+    relevant_cols = key_cols + [c for c in update_cols if c in df.columns]
+    df = df[[c for c in relevant_cols if c in df.columns]].copy()
+
+    records = df.to_dict(orient="records")
+    if not records:
+        logger.warning(f"  ⚠️  {table_name}: 無有效紀錄，跳過")
+        return
+
+    meta    = sa.MetaData()
+    table   = sa.Table(table_name, meta, autoload_with=engine)
+    stmt    = pg_insert(table).values(records)
+
+    # ON CONFLICT DO UPDATE — 只更新有差異的欄位
+    update_dict = {
+        col: stmt.excluded[col]
+        for col in update_cols
+        if col in df.columns
+    }
+
+    if update_dict:
+        stmt = stmt.on_conflict_do_update(
+            index_elements=key_cols,
+            set_=update_dict,
+        )
+    else:
+        stmt = stmt.on_conflict_do_nothing(index_elements=key_cols)
 
     try:
         with engine.begin() as conn:
-            if table_name in FULL_OVERWRITE_TABLES:
-                conn.execute(sa.text(f'TRUNCATE TABLE "{table_name}" RESTART IDENTITY CASCADE'))
-                df.to_sql(table_name, conn, if_exists="append", index=False)
-                logger.info(f"  ✅ {table_name}: 全量覆寫 {len(df)} 筆")
-            else:
-                temp_table = f"_temp_{table_name}"
-                df.to_sql(temp_table, conn, if_exists="replace", index=False)
-                cols = ", ".join([f'"{c}"' for c in df.columns])
-                constraints = ", ".join([f'"{c}"' for c in constraint_cols])
-                upsert_sql = f"""
-                    INSERT INTO "{table_name}" ({cols})
-                    SELECT {cols} FROM "{temp_table}"
-                    ON CONFLICT ({constraints}) DO NOTHING
-                """
-                conn.execute(sa.text(upsert_sql))
-                conn.execute(sa.text(f'DROP TABLE IF EXISTS "{temp_table}"'))
-                logger.info(f"  ✅ {table_name}: Upsert 嘗試 {len(df)} 筆")
+            result = conn.execute(stmt)
+        logger.info(f"  ✅ {table_name}: Upsert {len(records)} 筆（rows affected: {result.rowcount}）")
     except Exception as e:
         logger.error(f"  ❌ 寫入 {table_name} 失敗: {e}")
 
@@ -161,17 +237,22 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, engine: sa.Engine, const
 # 3. 資料轉換 (Transform)
 # ==============================================================================
 
-def transform_jobs(jobs_df: pd.DataFrame, pg_engine: sa.Engine):
+def transform_jobs(jobs_df: pd.DataFrame) -> pd.DataFrame:
     """
-    解析工單 act_desc 欄位，萃取保養週期 (mterm) 與等級 (grade)，
-    並與 PostgreSQL 中的 equit_check_item 對應，產生 inspection_result 初始記錄。
+    解析工單 act_desc 欄位，萃取保養週期 (mterm) 與等級 (grade)。
+
+    ▶ 與 v1 的差異：
+      - 移除 inspection_result 的預建邏輯（不再替 App 塞空白佔位紀錄）
+      - 量測結果的建立權完全歸屬 App 巡檢員
+
+    Args:
+        jobs_df: 從 Oracle 撈回的工單 DataFrame
 
     Returns:
-        jobs_enriched (pd.DataFrame): 原工單加上 mterm / grade 欄位（寫入 t_job 用）
-        result_df     (pd.DataFrame): 對應的 inspection_result 初始記錄
+        jobs_enriched: 工單加上解析出的 mterm / grade 欄位（供寫入 t_job 用）
     """
     if jobs_df.empty:
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame()
 
     # 從 act_desc 解析格式如「(3M) A級保養」的欄位
     pattern = re.compile(r"\((?P<mterm>\d+[MY])\).*?(?P<grade>[A-Z])級")
@@ -179,41 +260,26 @@ def transform_jobs(jobs_df: pd.DataFrame, pg_engine: sa.Engine):
     def parse_desc(row):
         m = pattern.search(str(row.get("act_desc", "")))
         if m:
-            return pd.Series([m.group("mterm"), m.group("grade"), True])
-        return pd.Series([None, None, False])
+            return pd.Series([m.group("mterm"), m.group("grade")])
+        return pd.Series([None, None])
 
     jobs_df = jobs_df.copy()
-    jobs_df[["mterm", "grade", "is_parsed"]] = jobs_df.apply(parse_desc, axis=1)
+    jobs_df[["mterm", "grade"]] = jobs_df.apply(parse_desc, axis=1)
 
-    parsed_df = jobs_df[jobs_df["is_parsed"]].copy()
-    unparsed = len(jobs_df) - len(parsed_df)
+    unparsed = jobs_df["mterm"].isna().sum()
     if unparsed > 0:
         logger.warning(f"  ⚠️  無法解析 act_desc 的工單: {unparsed} 筆（格式不符合 (NM/NY) X級）")
 
-    # 與 equit_check_item 對應，找出 item_id
-    try:
-        specs_df = pd.read_sql("SELECT item_id, grade, mterm FROM equit_check_item", pg_engine)
-    except Exception as e:
-        logger.error(f"  ❌ 無法讀取 equit_check_item: {e}")
-        return jobs_df, pd.DataFrame()
-
-    expanded = pd.merge(parsed_df, specs_df, on=["grade", "mterm"], how="inner")
-
-    if expanded.empty:
-        logger.warning("  ⚠️  工單與 equit_check_item 無任何匹配，inspection_result 將不會有新記錄")
-
-    # 組建 inspection_result 的初始記錄
-    result_df = expanded[["actid", "equipmentid", "item_id"]].copy()
-    result_df["measured_value"] = ""
-    result_df["act_mem_id"]     = expanded.get("act_mem_id", pd.Series("", index=expanded.index))
-    result_df["act_time"]       = pd.Timestamp.now()
-    result_df["is_out_of_spec"] = 0  # 初始狀態：未量測
-
-    # jobs_enriched：原工單加上解析出的 grade / mterm（供寫入 t_job）
-    keep_cols = [c for c in ["actid", "equipmentid", "act_desc", "mdate", "act_mem_id", "mterm", "grade"] if c in jobs_df.columns]
-    jobs_enriched = jobs_df[keep_cols].copy()
-
-    return jobs_enriched, result_df
+    # 只保留 t_job 需要的欄位（包含補回的 act_key / act_mem）
+    keep_cols = [
+        c for c in [
+            "actid", "equipmentid", "act_desc", "mdate",
+            "act_key", "act_mem_id", "act_mem",   # ← P0-1 修正：補回遺漏欄位
+            "mterm", "grade"
+        ]
+        if c in jobs_df.columns
+    ]
+    return jobs_df[keep_cols].copy()
 
 
 # ==============================================================================
@@ -222,7 +288,7 @@ def transform_jobs(jobs_df: pd.DataFrame, pg_engine: sa.Engine):
 
 def main():
     logger.info("=" * 60)
-    logger.info("🚀 AIMS Oracle 同步作業開始（Thick Mode / Oracle 11.2g）")
+    logger.info("🚀 AIMS Oracle 同步作業開始（Thick Mode / Oracle 11.2g）v2")
     logger.info("=" * 60)
 
     ora_eng = get_oracle_engine()
@@ -233,8 +299,9 @@ def main():
     three_months_ago = (datetime.today() - timedelta(days=90)).strftime("%Y%m%d")
 
     try:
-        jobs   = pd.read_sql(
-            f"SELECT actid, equipmentid, act_desc, mdate, act_mem_id "
+        # P0-1 修正：補齊 act_key（AIMS 工單聚合鍵）與 act_mem（負責人姓名）
+        jobs = pd.read_sql(
+            f"SELECT actid, equipmentid, act_desc, mdate, act_key, act_mem_id, act_mem "
             f"FROM t_job WHERE mdate >= '{three_months_ago}'",
             ora_eng
         )
@@ -252,19 +319,24 @@ def main():
     logger.info(f"  hr_organization:{len(hr_org)} 筆")
     logger.info(f"  hr_account:     {len(hr_acc)} 筆")
 
-    # ── Transform（轉換）────────────────────────────────────────────────────
-    logger.info("🔄 [2/3] Transform：解析工單並對應巡檢項目...")
-    jobs_enriched, result_df = transform_jobs(jobs, pg_eng)
-    logger.info(f"  成功解析工單: {len(jobs_enriched)} 筆，inspection_result 初始記錄: {len(result_df)} 筆")
+    # ── Transform（轉換）─────────────────────────────────────────────────────
+    logger.info("🔄 [2/3] Transform：解析工單 grade / mterm...")
+    jobs_enriched = transform_jobs(jobs)
+    logger.info(f"  成功解析工單: {len(jobs_enriched)} 筆")
+    # ▶ P1 修正：不再建立 inspection_result 初始記錄
+    #   理由：量測結果的建立權完全歸屬 App 巡檢員
+    #          若預建 is_out_of_spec=0 的空行，App 正常值（0）將被 ON CONFLICT DO NOTHING 吞掉
 
-    # ── Load（依外鍵順序寫入 PostgreSQL）───────────────────────────────────
-    logger.info("💾 [3/3] Load：寫入 PostgreSQL...")
-    upsert_dataframe(org,           "t_organization",   pg_eng, ["unitid"])
-    upsert_dataframe(equip,         "t_equipment",       pg_eng, ["id"])
-    upsert_dataframe(hr_org,        "hr_organization",   pg_eng, ["id"])
-    upsert_dataframe(hr_acc,        "hr_account",        pg_eng, ["id"])
-    upsert_dataframe(jobs_enriched, "t_job",             pg_eng, ["actid"])
-    upsert_dataframe(result_df,     "inspection_result", pg_eng, ["actid", "item_id", "equipmentid"])
+    # ── Load（依外鍵順序寫入 PostgreSQL）────────────────────────────────────
+    logger.info("💾 [3/3] Load：依外鍵順序寫入 PostgreSQL（SCD Type 1 Upsert）...")
+    # 外鍵依賴順序：組織/人員 → 設備 → 工單
+    upsert_dataframe(org,           "t_organization",  pg_eng)
+    upsert_dataframe(equip,         "t_equipment",     pg_eng)
+    upsert_dataframe(hr_org,        "hr_organization", pg_eng)
+    upsert_dataframe(hr_acc,        "hr_account",      pg_eng)
+    upsert_dataframe(jobs_enriched, "t_job",           pg_eng)
+    # inspection_result：不同步（量測結果僅由 App 巡檢員產生）
+    # abnormal_cases  ：不同步（純 FEM 業務資料，Oracle AIMS 不存在此概念）
 
     logger.info("=" * 60)
     logger.info("🏁 同步作業完成")
