@@ -4,10 +4,27 @@
 # ==============================================================================
 steps:
   # ==============================================================================
+  # 步驟 0: 從 GCS 下載 Oracle Instant Client zip（方案 B）
+  # 大型二進位檔存放於 GCS，不放入 Git Repo（保持 repo 乾淨 + 符合 VPC-SC）
+  # GCS 路徑：gs://prj-ai-intellipatrol-ip-artifacts/oracle/
+  # 首次部署前請手動執行：
+  #   gsutil cp instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip \
+  #     gs://prj-ai-intellipatrol-ip-artifacts/oracle/
+  # ==============================================================================
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'Download Oracle Client'
+    args:
+      - 'cp'
+      - 'gs://prj-ai-intellipatrol-ip-artifacts/oracle/instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip'
+      - './instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip'
+
+  # ==============================================================================
   # 步驟 1: 建置 Docker Image
   # ==============================================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build image'
+    waitFor:
+      - 'Download Oracle Client'
     entrypoint: 'sh'
     args:
       - '-c'
