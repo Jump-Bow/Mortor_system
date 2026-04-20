@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     curl \
     unzip \
+    libaio1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Oracle Instant Client 19.x (相容 Oracle 11.2g+) ──────────────────────────────
