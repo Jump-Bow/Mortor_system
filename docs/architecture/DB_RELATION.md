@@ -1,6 +1,6 @@
 # 資料庫關聯圖 (Database Relationship Diagram)
 
-本文件描述 FEM 系統的資料庫實體關聯圖 (ER Diagram) 與詳細關聯說明。
+本文件描述設備保養管理系統的資料庫實體關聯圖 (ER Diagram) 與詳細關聯說明。
 
 > **唯一真實來源**：所有欄位名稱與型別均來自 [`DB_SCHEMA.txt`](file:///d:/chimei/DB_SCHEMA.txt)。
 

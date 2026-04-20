@@ -341,4 +341,4 @@ python run.py
 
 - **版本**: 1.0.0
 - **更新日期**: 2025-01-15
-- **作者**: FEM Development Team
+- **作者**: Development Team

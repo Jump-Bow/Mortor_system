@@ -1,4 +1,4 @@
-﻿{% extends "layout/Mortor_base.html" %}
+{% extends "layout/Mortor_base.html" %}
 
 {% block title %}任務詳情 - 設備保養管理系統{% endblock %}
 {% block page_title %}任務詳情{% endblock %}
@@ -33,8 +33,7 @@
                             <dt class="col-sm-4">檢查日期:</dt>
                             <dd class="col-sm-8" id="inspection-date">-</dd>
                             
-                            <dt class="col-sm-4">指派人員:</dt>
-                            <dd class="col-sm-8" id="assigned-user">-</dd>
+                            <!-- 指派人員欄位已隱藏：AIMS 工單下載時無派工欄位，此資料不存在 -->
                         </dl>
                     </div>
                     <div class="col-md-6">
@@ -123,7 +122,7 @@ function displayTaskInfo() {
     $('#equipment-name').text(taskData.equipment_name || '-');
     
     $('#inspection-date').text(taskData.inspection_date || '-');
-    $('#assigned-user').text(taskData.assigned_user_name || '未指派');
+    // 指派人員欄位已隱藏（AIMS 工單下載時無派工欄位）
     
     // 狀態標籤
     const statusBadges = {

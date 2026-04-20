@@ -1,0 +1,87 @@
+diff --git a/devops/cloudbuild-main.yaml b/devops/cloudbuild-main.yaml
+index 1282c86..f6a6bb9 100644
+--- a/devops/cloudbuild-main.yaml
++++ b/devops/cloudbuild-main.yaml
+@@ -30,20 +30,16 @@ steps:
+         docker push ${_IMAGE_PATH}:${SHORT_SHA}
+ 
+   # ==============================================================================
+-  # 步驟 3: 部署到 Cloud Run
+-  # 使用 Direct VPC Egress，指定 Shared VPC 的網路與子網路
++  # 步驟 3: 部署到 Cloud Run Service
+   # ==============================================================================
+   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+-    id: 'Deploy to Cloud Run'
++    id: 'Deploy to Cloud Run Service'
+     waitFor:
+       - 'Push image'
+     entrypoint: 'bash'
+     args:
+       - '-c'
+       - |
+-        echo "Deploying image ${_IMAGE_PATH}:${SHORT_SHA} to project [${_DEPLOY_PROJECT_ID}]"
+-        echo "Connecting to Shared VPC Subnet: [${_VPC_SUBNET}]"
+-
+         gcloud run deploy ${_DEPLOY_SERVICE_NAME} \
+           --image ${_IMAGE_PATH}:${SHORT_SHA} \
+           --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
+@@ -54,8 +50,45 @@ steps:
+           --network "${_VPC_NETWORK}" \
+           --subnet "${_VPC_SUBNET}" \
+           --vpc-egress "all-traffic" \
++          --set-env-vars "FLASK_ENV=production,USE_AZURE_AD=true" \
++          --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest,AZURE_CLIENT_ID=FM_AZURE_CLIENT_ID:latest,AZURE_CLIENT_SECRET=FM_AZURE_CLIENT_SECRET:latest,AZURE_TENANT_ID=FM_AZURE_TENANT_ID:latest,AZURE_REDIRECT_URI=FM_AZURE_REDIRECT_URI:latest" \
+           --allow-unauthenticated
+ 
++  # ==============================================================================
++  # 步驟 4: 部署與執行資料庫初始化 Job (Cloud Run Job)
++  # ==============================================================================
++  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
++    id: 'Deploy and Run DB Init Job'
++    waitFor:
++      - 'Deploy to Cloud Run Service'
++    entrypoint: 'bash'
++    args:
++      - '-c'
++      - |
++        echo "Deploying Cloud Run Job: ${_DEPLOY_JOB_NAME}"
++        
++        # 部署/更新 Job 配置
++        gcloud run jobs deploy ${_DEPLOY_JOB_NAME} \
++          --image ${_IMAGE_PATH}:${SHORT_SHA} \
++          --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
++          --project "${_DEPLOY_PROJECT_ID}" \
++          --region ${_LOCATION} \
++          --command "python" \
++          --args "init_db.py" \
++          --network "${_VPC_NETWORK}" \
++          --subnet "${_VPC_SUBNET}" \
++          --vpc-egress "all-traffic" \
++          --set-env-vars "FLASK_ENV=production,SKIP_SAMPLE_DATA=true" \
++          --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest" \
++          --max-retries 0
++          
++        echo "Executing Cloud Run Job..."
++        # 執行 Job (同步等待直到完成)
++        gcloud run jobs execute ${_DEPLOY_JOB_NAME} \
++          --project "${_DEPLOY_PROJECT_ID}" \
++          --region ${_LOCATION} \
++          --wait
++
+ # ==============================================================================
+ # 設定與環境變數
+ # ==============================================================================
+@@ -67,11 +100,12 @@ substitutions:
+   # --- 【部署目標設定】 ---
+   _DEPLOY_PROJECT_ID: 'prj-ai-intellipatrol-ip'
+   _DEPLOY_SERVICE_NAME: 'motor-server'
++  _DEPLOY_JOB_NAME: 'motor-db-init'
+   _DEPLOY_SERVICE_ACCOUNT: 'intellipatrol-app-IP-sa@prj-ai-intellipatrol-ip.iam.gserviceaccount.com'
+   # --- 【Shared VPC 網路設定】 ---
+   _HOST_PROJECT_ID: 'cmccloud01-hostproject'
+   _SHARED_VPC_NAME: 'hostproject-middleware-sharedvpc'
+-  _SHARED_SUBNET_NAME: 'hostproject-sub77-serverless01'
++  _SHARED_SUBNET_NAME: 'middleware-sharedvpc-sub76'
+ 
+   # 自動組合完整的網路與子網路路徑
+   _VPC_NETWORK: 'projects/${_HOST_PROJECT_ID}/global/networks/${_SHARED_VPC_NAME}'
