@@ -83,8 +83,11 @@ def get_oracle_engine() -> sa.Engine:
         logger.error("請確認 GCP Secret Manager 已設定 ORA_DB_USER / ORA_DB_PASS / ORA_DB_SERVER / ORA_DB_PORT / ORA_DB_SERVICE")
         sys.exit(1)
 
-    # 啟用厚模式（指向 Instant Client 目錄）
-    lib_dir = os.environ.get("LD_LIBRARY_PATH", "/opt/oracle/instantclient")
+    # 取得厚模式（指向 Instant Client 目錄）
+    raw_lib_dir = os.environ.get("LD_LIBRARY_PATH", "/opt/oracle/instantclient")
+    # Docker 的 ENV 如果串接空變數會產生 "/opt/oracle/instantclient:"，必須濾掉冒號
+    lib_dir = raw_lib_dir.split(":")[0] if raw_lib_dir else "/opt/oracle/instantclient"
+
     try:
         oracledb.init_oracle_client(lib_dir=lib_dir)
         logger.info(f"Oracle Thick Mode 初始化完成，函式庫路徑: {lib_dir}")
