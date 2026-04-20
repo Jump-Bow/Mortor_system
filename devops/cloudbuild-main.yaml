@@ -5,6 +5,8 @@
 steps:
   # ==============================================================================
   # 步驟 1: 建置 Docker Image
+  # Oracle Instant Client zip (33MB) 直接由 Git repo 追蹤提供給 build context
+  # Git CLI 支援最高 100MB 單檔，33MB 安全無虞
   # ==============================================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build image'

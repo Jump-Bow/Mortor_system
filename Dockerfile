@@ -22,12 +22,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Oracle Instant Client 19.x (相容 Oracle 11.2g+) ──────────────────────────────
-# 將本地 33MB 的 zip 檔複製進 Docker 內解壓縮（避免 VPC 防火牆擋住外部下載）
-# 前提：請務必將 instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip 放在專案根目錄
+# zip (33MB) 直接由 git 追蹤，Git CLI 最高支援 100MB，安全無虞。
+# GitHub 網頁上傳限 25MB 不能用；本 repo 使用 git push 方式推送。
 COPY ./instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip /tmp/instantclient.zip
 RUN unzip -q /tmp/instantclient.zip -d /opt/oracle \
     && mv /opt/oracle/instantclient_19_24 /opt/oracle/instantclient \
     && rm /tmp/instantclient.zip
+
+# 設定 OS linker 路徑，讓 libnnz19.so 等函式庫能被系統直接找到
+ENV LD_LIBRARY_PATH=/opt/oracle/instantclient:$LD_LIBRARY_PATH
 
 # Copy requirements file
 COPY requirements.txt .
