@@ -258,20 +258,21 @@ def upload_photo(**kwargs):
     上傳異常照片 (multipart/form-data)
     
     Form Data:
-        - actid: 任務 ID
-        - itemid: 檢查項目 ID
-        - file: 圖片檔案
+        - actid:       任務 ID
+        - itemid:      檢查項目 ID
+        - equipmentid: 設備 ID（與 InspectionResult 三欄複合主鍵對齊）
+        - file:        圖片檔案
     
     Response:
         - resultphoto: 照片路徑
     """
     current_user = kwargs.get('current_user')
     
-    # Validate form data
-    if 'actid' not in request.form or 'itemid' not in request.form:
+    # Validate form data — equipmentid 是複合主鍵的第三欄，必須一併傳入
+    if 'actid' not in request.form or 'itemid' not in request.form or 'equipmentid' not in request.form:
         return jsonify({
             'status': 'error',
-            'message': '缺少 actid 或 itemid'
+            'message': '缺少 actid、itemid 或 equipmentid'
         }), 400
     
     if 'file' not in request.files:
@@ -282,11 +283,14 @@ def upload_photo(**kwargs):
     
     actid = request.form['actid']
     itemid = request.form['itemid']
+    equipmentid = request.form['equipmentid']
     file = request.files['file']
     
-    # Verify result exists
+    # Verify result exists — 使用完整三欄複合主鍵查詢，與 InspectionResult PK 定義嚴格對齊
+    # 若僅用 (actid, item_id) 兩欄，在同一工單跨設備情境下可能命中錯誤紀錄。
     result = InspectionResult.query.filter_by(
         actid=actid,
+        equipmentid=equipmentid,
         item_id=itemid
     ).first()
     
@@ -310,7 +314,7 @@ def upload_photo(**kwargs):
     db.session.commit()
     
     current_app.logger.info(
-        f'User {current_user.id} uploaded photo for task {actid} item {itemid}'
+        f'User {current_user.id} uploaded photo for task {actid} equipment {equipmentid} item {itemid}'
     )
     
     return jsonify({

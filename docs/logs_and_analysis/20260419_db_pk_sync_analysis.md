@@ -26,3 +26,28 @@ date: 2026-04-19
 ## 4. 修正與結論
 *   我們已經直接修改網頁端核心模組的 `app/models/Mortor_abnormal.py`，補上 `equipmentid` 相關的 `primary_key=True` 屬性。
 *   此修改讓 Server Schema 與 Flutter SQLite Schema 正式達到 MECE 上的嚴格對齊，防堵未來任一端同步引發重疊與索引相衝。
+
+---
+
+## 5. 後續補修（2026-04-20）
+
+在逐一審查所有觸碰 `InspectionResult` 的程式碼路徑後，發現 `upload_photo()` API 原本僅以 `(actid, item_id)` 兩欄查詢，未帶入 `equipmentid`，與三欄複合主鍵原則不符。
+
+已於 `app/api/Mortor_results.py` 補齊：
+
+| 路徑 | 修正前 | 修正後 |
+|------|--------|--------|
+| `upload_results` UPSERT | `(actid, equipmentid, item_id)` ✅ | 不變 |
+| `upload_photo` filter_by | `(actid, item_id)` ❌ | `(actid, equipmentid, item_id)` ✅ |
+
+詳見 `20260420_upload_api_photo_pk_fix.md`。
+
+至此，所有觸碰 `InspectionResult` 的寫入與查詢路徑均已完整對齊三欄複合主鍵：
+
+```
+InspectionResult PK: (actid, equipmentid, item_id)
+    ├── upload_results  UPSERT index_elements ✅
+    ├── upload_photo    filter_by             ✅ (2026-04-20 修補)
+    └── AbnormalCases   FK / PK               ✅ (2026-04-19 修補)
+```
+
