@@ -25,8 +25,3 @@ ENV/
 .ipynb_checkpoints/
 my_docker_logs.txt
 docker_logs_tmp.txt
-
-# Oracle Instant Client 大型二進位（存放於 GCS，不入 Git）
-# 上傳指令：gsutil cp instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip \
-#             gs://prj-ai-intellipatrol-ip-artifacts/oracle/
-instantclient-basiclite-linux.x64-*.zip

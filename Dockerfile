@@ -22,9 +22,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Oracle Instant Client 19.x (相容 Oracle 11.2g+) ──────────────────────────────
-# 策略（方案 B）：zip 存放於 GCS，由 cloudbuild-main.yaml 步驟 0 在 build 前下載到
-# build context，再由此 COPY 指令打包進映像。
-# 大型二進位檔不放入 Git，確保 repo 乾淨且符合 VPC-SC 限制。
+# zip (33MB) 直接由 git 追蹤，Git CLI 最高支援 100MB，安全無虞。
+# GitHub 網頁上傳限 25MB 不能用；本 repo 使用 git push 方式推送。
 COPY ./instantclient-basiclite-linux.x64-19.24.0.0.0dbru.zip /tmp/instantclient.zip
 RUN unzip -q /tmp/instantclient.zip -d /opt/oracle \
     && mv /opt/oracle/instantclient_19_24 /opt/oracle/instantclient \
