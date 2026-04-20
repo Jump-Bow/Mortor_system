@@ -24,48 +24,41 @@ def validate_json(f):
 
 def rate_limit(max_requests: int, time_window: int):
     """
-    簡易的 Rate Limiting 裝飾器
-    
+    API 速率限制裝飾器（基於 Redis 滑動窗口，跨 Worker 有效）
+
+    使用 app/middleware/rate_limiter.py 的 RateLimiter，
+    透過 Redis 計數確保多 Gunicorn Worker 共享同一計數狀態。
+    Redis 不可用時自動降級為放行（不限制），不影響服務可用性。
+
     Args:
         max_requests: 時間窗口內最大請求數
-        time_window: 時間窗口 (秒)
+        time_window:  時間窗口（秒）
     """
-    request_history = {}
-    
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
             if not current_app.config.get('RATELIMIT_ENABLED', True):
                 return f(*args, **kwargs)
-            
-            client_ip = request.remote_addr
-            current_time = time.time()
-            
-            # Initialize or clean old records
-            if client_ip not in request_history:
-                request_history[client_ip] = []
-            
-            # Remove old requests outside time window
-            request_history[client_ip] = [
-                req_time for req_time in request_history[client_ip]
-                if current_time - req_time < time_window
-            ]
-            
-            # Check rate limit
-            if len(request_history[client_ip]) >= max_requests:
+
+            from app.middleware.rate_limiter import RateLimiter
+            client_ip = request.remote_addr or 'unknown'
+
+            is_limited, remaining, reset_time = RateLimiter._check_limit(
+                client_ip, max_requests, time_window
+            )
+
+            if is_limited:
                 return jsonify({
                     'status': 'error',
                     'error_code': 'TOO_MANY_REQUESTS',
                     'message': f'請求過於頻繁，請在 {time_window} 秒後重試'
                 }), 429
-            
-            # Add current request
-            request_history[client_ip].append(current_time)
-            
+
             return f(*args, **kwargs)
-        
+
         return decorated
     return decorator
+
 
 
 def log_request(f):

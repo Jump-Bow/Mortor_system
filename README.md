@@ -1,11 +1,11 @@
-# FEM 設備保養管理系統 (Facility Equipment Maintenance System)
+# 設備保養管理系統
 
 ![Python Version](https://img.shields.io/badge/python-3.10.13-blue.svg)
 ![Flask Version](https://img.shields.io/badge/flask-3.0.0-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![PostgreSQL](https://img.shields.io/badge/database-postgresql-blue.svg)
 
-**FEM 設備保養管理系統**是一個完整的設備巡檢、保養與維修管理解決方案，包含網頁管理後台與行動應用程式，支援離線作業。
+**設備保養管理系統**是一個完整的設備巡檢、保養與維修管理解決方案，包含網頁管理後台與行動應用程式，支援離線作業。
 
 ## 📋 目錄
 
@@ -95,7 +95,7 @@
 
 ```bash
 git clone <repository-url>
-cd fem-admin
+cd chimei-fem-admin
 ```
 
 2. **建立虛擬環境**

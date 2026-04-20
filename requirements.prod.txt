@@ -1,0 +1,59 @@
+# ============================================================
+# requirements.prod.txt — Production 環境專用依賴清單
+# ============================================================
+# 用途：供 Dockerfile Multi-stage Build 的 Final Stage 使用
+# 排除項目：pytest, pytest-cov, pytest-flask, pytest-mock,
+#           flake8, black, python-decouple（純開發/測試工具）
+# 完整開發依賴（含測試工具）請使用 requirements.txt
+# ============================================================
+
+# Flask Core
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+Flask-Login==0.6.3
+Flask-Caching==2.1.0
+Flask-Talisman==1.1.0
+Flask-CORS==4.0.0
+Flask-WTF==1.2.1
+WTForms==3.1.1
+
+# Database
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.23
+redis==5.0.1
+
+# Authentication & Security
+PyJWT==2.8.0
+bcrypt==4.1.2
+cryptography==41.0.7
+python-dotenv==1.0.0
+
+# Azure AD Integration
+msal==1.26.0
+azure-identity==1.15.0
+
+# API & Validation
+marshmallow==3.20.1
+webargs==8.3.0
+flask-swagger-ui==4.11.1
+
+# Image Processing
+Pillow==10.1.0
+
+# Date & Time
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Oracle Integration (AIMS - Thick Mode, Oracle 11.2g compatible)
+oracledb==2.1.2
+pandas==2.1.4
+
+# HTTP Requests (for AIMS integration)
+requests==2.31.0
+
+# Logging
+python-json-logger==2.0.7
+
+# Admin Template
+Flask-Admin==1.6.1

@@ -4,12 +4,31 @@
 # ==============================================================================
 steps:
   # ==============================================================================
+  # 步驟 0: 執行單元測試（測試失敗則整個 Pipeline 強制中止，不進行 Build/Deploy）
+  # ==============================================================================
+  - name: 'python:3.10-slim'
+    id: 'Run Unit Tests'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== [0] 安裝測試依賴 ==="
+        echo "[0] 時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        pip install --quiet -r requirements.txt
+        echo "=== [0] 執行 pytest (排除需外部服務的探索性測試) ==="
+        pytest tests/ -v --tb=short \
+          --ignore=tests/test_exploratory.py
+        echo "[0] ✅ 所有單元測試通過，允許進行 Build 與 Deploy"
+
+  # ==============================================================================
   # 步驟 1: 建置 Docker Image
   # Oracle Instant Client zip (33MB) 直接由 Git repo 追蹤提供給 build context
   # Git CLI 支援最高 100MB 單檔，33MB 安全無虞
   # ==============================================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build image'
+    waitFor:
+      - 'Run Unit Tests'
     entrypoint: 'sh'
     args:
       - '-c'

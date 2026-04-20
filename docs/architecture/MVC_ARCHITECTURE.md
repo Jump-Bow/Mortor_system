@@ -1,4 +1,4 @@
-# FEM 設備保養管理系統 - MVC 架構說明
+# 設備保養管理系統 - MVC 架構說明
 
 ## 目錄
 - [MVC 架構概述](#mvc-架構概述)
@@ -249,7 +249,7 @@ base.html (基礎版面)
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <title>{% block title %}FEM 設備保養管理系統{% endblock %}</title>
+    <title>{% block title %}設備保養管理系統{% endblock %}</title>
     <!-- AdminLTE CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
     <!-- 自定義 CSS -->
@@ -268,7 +268,7 @@ base.html (基礎版面)
 <!-- app/templates/task/list.html -->
 {% extends "layout/base.html" %}
 
-{% block title %}任務列表 - FEM{% endblock %}
+{% block title %}任務列表 - 設備保養管理系統{% endblock %}
 
 {% block content %}
 <div class="card">

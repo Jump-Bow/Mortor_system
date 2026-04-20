@@ -159,6 +159,26 @@ def login():
         username = data['username']
         password = data['password']
 
+        # ── 雙維度登入速率限制（IP + 帳號），防止 Brute-force 攻擊 ──────────────
+        # 注意：必須在 DB 查詢之前執行，避免攻擊者消耗資料庫連線資源
+        if current_app.config.get('RATELIMIT_ENABLED', True):
+            from app.middleware.rate_limiter import RateLimiter
+            is_limited, dimension, reset_time = RateLimiter.check_login_limit(
+                ip=request.remote_addr or 'unknown',
+                username=username
+            )
+            if is_limited:
+                dim_msg = '此帳號' if dimension == 'account' else '此 IP'
+                response = jsonify({
+                    'status': 'error',
+                    'error_code': 'TOO_MANY_REQUESTS',
+                    'message': f'{dim_msg}登入嘗試次數過多，請 15 分鐘後再試',
+                })
+                response.status_code = 429
+                response.headers['Retry-After'] = str(reset_time)
+                return response
+        # ─────────────────────────────────────────────────────────────────────────
+
         # Find user
         user = HrAccount.query.filter_by(id=username).first()
 

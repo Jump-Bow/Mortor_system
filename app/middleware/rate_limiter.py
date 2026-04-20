@@ -96,6 +96,41 @@ class RateLimiter:
             response.headers.setdefault('X-RateLimit-Limit', str(max_requests))
             
             return response
+
+    @classmethod
+    def check_login_limit(cls, ip: str, username: str):
+        """
+        登入端點雙維度速率限制（防 Brute-force 攻擊）
+
+        維度 1 — IP：每 IP 每 15 分鐘最多 10 次登入請求
+                      防止同一網段的快速暴力嘗試
+        維度 2 — 帳號：每帳號每 15 分鐘最多 5 次
+                      防止攻擊者用多個 IP 輪換繞過 IP 限制
+
+        Returns:
+            (is_limited: bool, dimension: str, reset_seconds: int)
+            dimension 為 'ip' 或 'account'，供錯誤訊息使用
+        """
+        LOGIN_IP_LIMIT = 10       # 每 IP 每窗口最大登入次數
+        LOGIN_ACCOUNT_LIMIT = 5   # 每帳號每窗口最大登入次數
+        LOGIN_WINDOW = 900        # 窗口大小：15 分鐘
+
+        # 維度 1：IP 檢查
+        is_limited, _, reset_time = cls._check_limit(
+            f'login_ip:{ip}', LOGIN_IP_LIMIT, LOGIN_WINDOW
+        )
+        if is_limited:
+            return True, 'ip', reset_time
+
+        # 維度 2：帳號檢查
+        is_limited, _, reset_time = cls._check_limit(
+            f'login_account:{username}', LOGIN_ACCOUNT_LIMIT, LOGIN_WINDOW
+        )
+        if is_limited:
+            return True, 'account', reset_time
+
+        return False, None, 0
+
     
     @classmethod
     def _check_limit(cls, client_id, max_requests, window_seconds):
