@@ -176,7 +176,8 @@ TABLE_UPSERT_CONFIG = {
         "key": ["actid"],
         # 工單一旦存在，僅補齊可能在 AIMS 側更新的欄位
         # 絕對不更新 equipmentid / mdate（App 端量測結果依賴此關聯）
-        "update": ["act_key", "act_mem"],
+        # act_mem / act_mem_id 為 FEM 自訂欄位，Oracle 原生不存在，不同步
+        "update": ["act_key"],
     },
 }
 
@@ -278,12 +279,12 @@ def transform_jobs(jobs_df: pd.DataFrame) -> pd.DataFrame:
     if unparsed > 0:
         logger.warning(f"  ⚠️  無法解析 act_desc 的工單: {unparsed} 筆（格式不符合 (NM/NY) X級）")
 
-    # 只保留 t_job 需要的欄位（包含補回的 act_key / act_mem）
+    # 只保留 t_job 需要的欄位
+    # act_mem / act_mem_id 為 FEM 自訂欄位，Oracle 原生不存在，已從查詢移除
     keep_cols = [
         c for c in [
             "actid", "equipmentid", "act_desc", "mdate",
-            "act_key", "act_mem_id", "act_mem",   # ← P0-1 修正：補回遺漏欄位
-            "mterm", "grade"
+            "act_key", "mterm", "grade"
         ]
         if c in jobs_df.columns
     ]
@@ -307,10 +308,10 @@ def main():
     three_months_ago = (datetime.today() - timedelta(days=90)).strftime("%Y%m%d")
 
     try:
-        # P0-1 修正：補齊 act_key（AIMS 工單聚合鍵）與 act_mem（負責人姓名）
         # ORA-00942 修正：所有資料表加上 Schema 前綴（ORA_PREFIX = "chimei."）
+        # ORA-00904 修正：移除 act_mem / act_mem_id（Oracle 原生不存在，為 FEM 自訂欄位）
         jobs = pd.read_sql(
-            f"SELECT actid, equipmentid, act_desc, mdate, act_key, act_mem_id, act_mem "
+            f"SELECT actid, equipmentid, act_desc, mdate, act_key "
             f"FROM {ORA_PREFIX}t_job WHERE mdate >= '{three_months_ago}'",
             ora_eng
         )
