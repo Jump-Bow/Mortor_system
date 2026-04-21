@@ -64,7 +64,12 @@ ORACLE_CONFIG = {
     "host":         os.environ.get("ORA_DB_SERVER"),
     "port":         int(os.environ.get("ORA_DB_PORT", "1521")),
     "service_name": os.environ.get("ORA_DB_SERVICE"),
+    "schema":       os.environ.get("ORA_DB_SCHEMA", "chimei"),  # Oracle Schema 前綴
 }
+
+# 查詢用 Schema 前綴（e.g. "chimei."），空字串則無前綴
+_SCHEMA = os.environ.get("ORA_DB_SCHEMA", "chimei")
+ORA_PREFIX = f"{_SCHEMA}." if _SCHEMA else ""
 
 
 def get_oracle_engine() -> sa.Engine:
@@ -303,15 +308,16 @@ def main():
 
     try:
         # P0-1 修正：補齊 act_key（AIMS 工單聚合鍵）與 act_mem（負責人姓名）
+        # ORA-00942 修正：所有資料表加上 Schema 前綴（ORA_PREFIX = "chimei."）
         jobs = pd.read_sql(
             f"SELECT actid, equipmentid, act_desc, mdate, act_key, act_mem_id, act_mem "
-            f"FROM t_job WHERE mdate >= '{three_months_ago}'",
+            f"FROM {ORA_PREFIX}t_job WHERE mdate >= '{three_months_ago}'",
             ora_eng
         )
-        equip  = pd.read_sql("SELECT id, name, assetid, unitid FROM t_equipment", ora_eng)
-        org    = pd.read_sql("SELECT unitid, parentunitid, unitname, unittype FROM t_organization", ora_eng)
-        hr_org = pd.read_sql("SELECT id, parentid, name FROM hr_organization", ora_eng)
-        hr_acc = pd.read_sql("SELECT id, name, organizationid, email FROM hr_account", ora_eng)
+        equip  = pd.read_sql(f"SELECT id, name, assetid, unitid FROM {ORA_PREFIX}t_equipment", ora_eng)
+        org    = pd.read_sql(f"SELECT unitid, parentunitid, unitname, unittype FROM {ORA_PREFIX}t_organization", ora_eng)
+        hr_org = pd.read_sql(f"SELECT id, parentid, name FROM {ORA_PREFIX}hr_organization", ora_eng)
+        hr_acc = pd.read_sql(f"SELECT id, name, organizationid, email FROM {ORA_PREFIX}hr_account", ora_eng)
     except Exception as e:
         logger.error(f"❌ Oracle 資料讀取失敗: {e}")
         return
