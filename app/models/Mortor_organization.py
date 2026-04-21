@@ -10,7 +10,7 @@ class TOrganization(db.Model):
     __tablename__ = 't_organization'
     
     unitid = db.Column(db.String(48), primary_key=True)
-    parentunitid = db.Column(db.String(48), db.ForeignKey('t_organization.unitid'), nullable=True)
+    parentunitid = db.Column(db.String(48), db.ForeignKey('t_organization.unitid', deferrable=True, initially='DEFERRED'), nullable=True)
     unitname = db.Column(db.String(96), nullable=False)
     unittype = db.Column(db.String(48), nullable=False)
     
@@ -49,7 +49,7 @@ class HrOrganization(db.Model):
     __tablename__ = 'hr_organization'
     
     id = db.Column(db.String(48), primary_key=True)
-    parentid = db.Column(db.String(48), db.ForeignKey('hr_organization.id'), nullable=True)
+    parentid = db.Column(db.String(48), db.ForeignKey('hr_organization.id', deferrable=True, initially='DEFERRED'), nullable=True)
     name = db.Column(db.String(96), nullable=False)
     
     # Self-referential relationship (樹狀結構)

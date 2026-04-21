@@ -412,7 +412,18 @@ def main():
             f"（organizationid 未出現在 hr_organization，FK 防護）"
         )
     upsert_dataframe(hr_acc_valid,  "hr_account",      pg_eng)
-    upsert_dataframe(jobs_enriched, "t_job",           pg_eng)
+
+    # ── NOT NULL 防護：t_job.mdate 不可為 null ────────────────────────────────
+    # PostgreSQL t_job.mdate 定義為 nullable=False，
+    # 但 Oracle AIMS 存在 mdate=NULL 的工單（未排定日期），需在此過濾。
+    jobs_valid = jobs_enriched.dropna(subset=["mdate"]).copy()
+    null_mdate_count = len(jobs_enriched) - len(jobs_valid)
+    if null_mdate_count > 0:
+        logger.warning(
+            f"  ⚠️  t_job: 略過 {null_mdate_count} 筆 mdate=NULL 的工單"
+            f"（Oracle 未排定日期，不符合 NOT NULL 約束）"
+        )
+    upsert_dataframe(jobs_valid, "t_job", pg_eng)
     # inspection_result：不同步（量測結果僅由 App 巡檢員產生）
     # abnormal_cases  ：不同步（純 FEM 業務資料，Oracle AIMS 不存在此概念）
 
