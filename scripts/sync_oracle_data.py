@@ -324,10 +324,56 @@ def main():
             f"FROM {ORA_PREFIX}t_job WHERE mdate >= '{three_months_ago}'",
             ora_eng
         )
-        equip  = pd.read_sql(f"SELECT id, name, assetid, unitid FROM {ORA_PREFIX}t_equipment", ora_eng)
-        org    = pd.read_sql(f"SELECT unitid, parentunitid, unitname, unittype FROM {ORA_PREFIX}t_organization", ora_eng)
-        hr_org = pd.read_sql(f"SELECT id, parentid, name FROM {ORA_PREFIX}hr_organization", ora_eng)
-        hr_acc = pd.read_sql(f"SELECT id, name, organizationid, email FROM {ORA_PREFIX}hr_account", ora_eng)
+        equip = pd.read_sql(
+            f"SELECT id, name, assetid, unitid FROM {ORA_PREFIX}t_equipment",
+            ora_eng
+        )
+
+        # ── t_organization 去重（CardinalityViolation 根本修復）────────────────
+        # Oracle AIMS 設計：同一 unitid 存在兩筆，一筆 parentunitid=unitid（自我指向，
+        # 代表此 unit 為獨立實體的 master record），另一筆 parentunitid=真正父節點。
+        # PostgreSQL 要求 unitid 唯一，因此必須在 Oracle SQL 層以 ROW_NUMBER() 去重。
+        # 優先序：① 非自我指向（保留真實層級）> ② 非 '*' 父節點 > ③ unittype 字典序
+        org = pd.read_sql(
+            f"""
+            SELECT unitid, parentunitid, unitname, unittype
+            FROM (
+                SELECT unitid, parentunitid, unitname, unittype,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY unitid
+                           ORDER BY
+                               CASE WHEN parentunitid <> unitid THEN 0 ELSE 1 END,
+                               CASE WHEN parentunitid = '*'     THEN 1 ELSE 0 END,
+                               unittype
+                       ) AS rn
+                FROM {ORA_PREFIX}t_organization
+            ) WHERE rn = 1
+            """,
+            ora_eng
+        )
+
+        # ── hr_organization 去重（同樣防護，id 可能重複）────────────────────────
+        hr_org = pd.read_sql(
+            f"""
+            SELECT id, parentid, name
+            FROM (
+                SELECT id, parentid, name,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY id
+                           ORDER BY
+                               CASE WHEN parentid <> id THEN 0 ELSE 1 END,
+                               CASE WHEN parentid = '*' THEN 1 ELSE 0 END
+                       ) AS rn
+                FROM {ORA_PREFIX}hr_organization
+            ) WHERE rn = 1
+            """,
+            ora_eng
+        )
+
+        hr_acc = pd.read_sql(
+            f"SELECT id, name, organizationid, email FROM {ORA_PREFIX}hr_account",
+            ora_eng
+        )
     except Exception as e:
         logger.error(f"❌ Oracle 資料讀取失敗: {e}")
         return
