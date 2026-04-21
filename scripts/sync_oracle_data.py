@@ -210,6 +210,15 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, engine: sa.Engine) -> No
     relevant_cols = key_cols + [c for c in update_cols if c in df.columns]
     df = df[[c for c in relevant_cols if c in df.columns]].copy()
 
+    # ── CardinalityViolation 防護 ────────────────────────────────────────────
+    # PostgreSQL ON CONFLICT DO UPDATE 不允許同批次對同一行 UPDATE 兩次。
+    # 若 Oracle 來源有重複主鍵（資料品質問題），必須在此去重，保留最後一筆。
+    before_count = len(df)
+    df = df.drop_duplicates(subset=key_cols, keep="last")
+    dup_count = before_count - len(df)
+    if dup_count > 0:
+        logger.warning(f"  ⚠️  {table_name}: 發現並移除 {dup_count} 筆重複主鍵紀錄（CardinalityViolation 防護）")
+
     records = df.to_dict(orient="records")
     if not records:
         logger.warning(f"  ⚠️  {table_name}: 無有效紀錄，跳過")
@@ -315,10 +324,56 @@ def main():
             f"FROM {ORA_PREFIX}t_job WHERE mdate >= '{three_months_ago}'",
             ora_eng
         )
-        equip  = pd.read_sql(f"SELECT id, name, assetid, unitid FROM {ORA_PREFIX}t_equipment", ora_eng)
-        org    = pd.read_sql(f"SELECT unitid, parentunitid, unitname, unittype FROM {ORA_PREFIX}t_organization", ora_eng)
-        hr_org = pd.read_sql(f"SELECT id, parentid, name FROM {ORA_PREFIX}hr_organization", ora_eng)
-        hr_acc = pd.read_sql(f"SELECT id, name, organizationid, email FROM {ORA_PREFIX}hr_account", ora_eng)
+        equip = pd.read_sql(
+            f"SELECT id, name, assetid, unitid FROM {ORA_PREFIX}t_equipment",
+            ora_eng
+        )
+
+        # ── t_organization 去重（CardinalityViolation 根本修復）────────────────
+        # Oracle AIMS 設計：同一 unitid 存在兩筆，一筆 parentunitid=unitid（自我指向，
+        # 代表此 unit 為獨立實體的 master record），另一筆 parentunitid=真正父節點。
+        # PostgreSQL 要求 unitid 唯一，因此必須在 Oracle SQL 層以 ROW_NUMBER() 去重。
+        # 優先序：① 非自我指向（保留真實層級）> ② 非 '*' 父節點 > ③ unittype 字典序
+        org = pd.read_sql(
+            f"""
+            SELECT unitid, parentunitid, unitname, unittype
+            FROM (
+                SELECT unitid, parentunitid, unitname, unittype,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY unitid
+                           ORDER BY
+                               CASE WHEN parentunitid <> unitid THEN 0 ELSE 1 END,
+                               CASE WHEN parentunitid = '*'     THEN 1 ELSE 0 END,
+                               unittype
+                       ) AS rn
+                FROM {ORA_PREFIX}t_organization
+            ) WHERE rn = 1
+            """,
+            ora_eng
+        )
+
+        # ── hr_organization 去重（同樣防護，id 可能重複）────────────────────────
+        hr_org = pd.read_sql(
+            f"""
+            SELECT id, parentid, name
+            FROM (
+                SELECT id, parentid, name,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY id
+                           ORDER BY
+                               CASE WHEN parentid <> id THEN 0 ELSE 1 END,
+                               CASE WHEN parentid = '*' THEN 1 ELSE 0 END
+                       ) AS rn
+                FROM {ORA_PREFIX}hr_organization
+            ) WHERE rn = 1
+            """,
+            ora_eng
+        )
+
+        hr_acc = pd.read_sql(
+            f"SELECT id, name, organizationid, email FROM {ORA_PREFIX}hr_account",
+            ora_eng
+        )
     except Exception as e:
         logger.error(f"❌ Oracle 資料讀取失敗: {e}")
         return
@@ -343,7 +398,20 @@ def main():
     upsert_dataframe(org,           "t_organization",  pg_eng)
     upsert_dataframe(equip,         "t_equipment",     pg_eng)
     upsert_dataframe(hr_org,        "hr_organization", pg_eng)
-    upsert_dataframe(hr_acc,        "hr_account",      pg_eng)
+
+    # ── ForeignKeyViolation 防護：hr_account → hr_organization ───────────────
+    # hr_account.organizationid 受 FK 約束，若 Oracle 來源有孤兒紀錄
+    # （organizationid 不存在於 hr_organization），寫入時 PG 會報 FK 錯誤。
+    # 解法：以 hr_org 實際同步成功的 id 集合做白名單過濾。
+    valid_org_ids = set(hr_org["id"].dropna().astype(str))
+    hr_acc_valid  = hr_acc[hr_acc["organizationid"].astype(str).isin(valid_org_ids)].copy()
+    orphan_count  = len(hr_acc) - len(hr_acc_valid)
+    if orphan_count > 0:
+        logger.warning(
+            f"  ⚠️  hr_account: 略過 {orphan_count} 筆孤兒紀錄"
+            f"（organizationid 未出現在 hr_organization，FK 防護）"
+        )
+    upsert_dataframe(hr_acc_valid,  "hr_account",      pg_eng)
     upsert_dataframe(jobs_enriched, "t_job",           pg_eng)
     # inspection_result：不同步（量測結果僅由 App 巡檢員產生）
     # abnormal_cases  ：不同步（純 FEM 業務資料，Oracle AIMS 不存在此概念）
