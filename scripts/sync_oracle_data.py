@@ -210,6 +210,15 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, engine: sa.Engine) -> No
     relevant_cols = key_cols + [c for c in update_cols if c in df.columns]
     df = df[[c for c in relevant_cols if c in df.columns]].copy()
 
+    # ── CardinalityViolation 防護 ────────────────────────────────────────────
+    # PostgreSQL ON CONFLICT DO UPDATE 不允許同批次對同一行 UPDATE 兩次。
+    # 若 Oracle 來源有重複主鍵（資料品質問題），必須在此去重，保留最後一筆。
+    before_count = len(df)
+    df = df.drop_duplicates(subset=key_cols, keep="last")
+    dup_count = before_count - len(df)
+    if dup_count > 0:
+        logger.warning(f"  ⚠️  {table_name}: 發現並移除 {dup_count} 筆重複主鍵紀錄（CardinalityViolation 防護）")
+
     records = df.to_dict(orient="records")
     if not records:
         logger.warning(f"  ⚠️  {table_name}: 無有效紀錄，跳過")
@@ -343,7 +352,20 @@ def main():
     upsert_dataframe(org,           "t_organization",  pg_eng)
     upsert_dataframe(equip,         "t_equipment",     pg_eng)
     upsert_dataframe(hr_org,        "hr_organization", pg_eng)
-    upsert_dataframe(hr_acc,        "hr_account",      pg_eng)
+
+    # ── ForeignKeyViolation 防護：hr_account → hr_organization ───────────────
+    # hr_account.organizationid 受 FK 約束，若 Oracle 來源有孤兒紀錄
+    # （organizationid 不存在於 hr_organization），寫入時 PG 會報 FK 錯誤。
+    # 解法：以 hr_org 實際同步成功的 id 集合做白名單過濾。
+    valid_org_ids = set(hr_org["id"].dropna().astype(str))
+    hr_acc_valid  = hr_acc[hr_acc["organizationid"].astype(str).isin(valid_org_ids)].copy()
+    orphan_count  = len(hr_acc) - len(hr_acc_valid)
+    if orphan_count > 0:
+        logger.warning(
+            f"  ⚠️  hr_account: 略過 {orphan_count} 筆孤兒紀錄"
+            f"（organizationid 未出現在 hr_organization，FK 防護）"
+        )
+    upsert_dataframe(hr_acc_valid,  "hr_account",      pg_eng)
     upsert_dataframe(jobs_enriched, "t_job",           pg_eng)
     # inspection_result：不同步（量測結果僅由 App 巡檢員產生）
     # abnormal_cases  ：不同步（純 FEM 業務資料，Oracle AIMS 不存在此概念）
