@@ -7,7 +7,7 @@ from app import db
 from app.models.Mortor_inspection import TJob
 from app.models.Mortor_equipment import TEquipment, EquitCheckItem
 from app.models.Mortor_user import HrAccount
-from app.auth.jwt_handler import token_required
+from app.auth.jwt_handler import token_required, token_optional
 from app.utils.decorators import log_request
 from app.utils.validators import Validator
 from datetime import datetime, date
@@ -18,25 +18,20 @@ tasks_bp = Blueprint('tasks', __name__)
 
 
 @tasks_bp.route('/download', methods=['GET'])
-@token_required
+@token_optional
 @log_request
 def download_tasks(**kwargs):
     """
-    下載指派給使用者的巡檢任務
+    下載巡檢工單（無須登入）
+
+    設計原則：工廠 PDA 為共用設備，工單屬於廠區公開排班資料。
+    - 未登入（匿名）：依日期下載當日所有工單
+    - 已登入：同上，另記錄稽核日誌（誰在幾點下載）
+    - currentUser=true 時：只回傳指派給自己的工單（選填過濾）
     """
-    current_user = kwargs.get('current_user')
-    
-    # Get user_id from query parameter or use current user
-    user_id = request.args.get('user_id', current_user.id)
-    
-    # Verify permission
-    if user_id != current_user.id:
-        return jsonify({
-            'status': 'error',
-            'message': '權限不足'
-        }), 403
-    
-    # Get date filter
+    current_user = kwargs.get('current_user')  # 可能為 None（匿名）
+
+    # ── 日期過濾 ─────────────────────────────────────────────────────────────
     date_str = request.args.get('date')
     if date_str:
         if not Validator.validate_date_format(date_str):
@@ -47,24 +42,25 @@ def download_tasks(**kwargs):
         filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     else:
         filter_date = date.today()
-    
-    # Query tasks (Updated field actmemid -> act_mem_id)
-    tasks_query = TJob.query.filter_by(act_mem_id=user_id)
-    
-    if date_str:
-        # P2-9：mdate 是 VARCHAR(8)，統一轉為 YYYYMMDD 字串比較
-        filter_date_str = filter_date.strftime('%Y%m%d')
-        tasks_query = tasks_query.filter(TJob.mdate >= filter_date_str)
-    
+
+    filter_date_str = filter_date.strftime('%Y%m%d')
+
+    # ── 查詢工單（以日期為主，不綁定人員）───────────────────────────────────
+    tasks_query = TJob.query.filter(TJob.mdate >= filter_date_str)
+
+    # currentUser=true 且已登入 → 額外過濾「指派給自己」的工單
+    current_user_only = request.args.get('currentUser', 'false').lower() == 'true'
+    if current_user_only and current_user:
+        tasks_query = tasks_query.filter_by(act_mem_id=current_user.id)
+
     tasks = tasks_query.all()
-    
-    # Build response with full task details
+
+    # ── 組裝回應 ──────────────────────────────────────────────────────────────
     tasks_data = []
     for task in tasks:
         assigned_user = task.assigned_user if task.act_mem_id else None
         equipment = task.equipment
-        
-        # P0-1：巡檢項目改為查通用表（按 grade/mterm），不再用已移除的 equipment.check_items 關聯
+
         check_items_objs = EquitCheckItem.query.filter_by(
             grade=task.grade,
             mterm=task.mterm
@@ -87,7 +83,6 @@ def download_tasks(**kwargs):
                 'is_required': True
             })
 
-        # P1-7：完成數排除 is_out_of_spec=0（未填寫 / 取消停機後的空白紀錄）
         total_items = len(check_items)
         completed_items = 0
 
@@ -100,10 +95,6 @@ def download_tasks(**kwargs):
         else:
             completion_rate = 0
 
-        current_app.logger.debug(
-            f' assigned task {task.actid} and act_mem_id {task.act_mem_id}'
-        )
-        
         tasks_data.append({
             'actid': task.actid,
             'act_key': task.act_key,
@@ -115,8 +106,6 @@ def download_tasks(**kwargs):
             'act_mem': assigned_user.name if assigned_user else task.act_mem,
             'grade': task.grade,
             'mterm': task.mterm,
-            # P0-B：App TaskModel.fromJson 讀 total_items / completed_items
-            # completed_items 需與 P1-7 一致：排除 is_out_of_spec=0（未填寫）
             'total_items': total_items,
             'completed_items': completed_items,
             'completion_rate': round(completion_rate, 1),
@@ -124,11 +113,17 @@ def download_tasks(**kwargs):
             'unitname': equipment.facility.unitname if equipment and equipment.facility else None,
             'equipment_check_items': check_items
         })
-    
-    current_app.logger.info(
-        f'User {current_user.id} downloaded {len(tasks)} tasks for date {filter_date}'
-    )
-    
+
+    # ── 稽核日誌（僅已登入才記錄） ────────────────────────────────────────────
+    if current_user:
+        current_app.logger.info(
+            f'User {current_user.id} downloaded {len(tasks)} tasks for date {filter_date}'
+        )
+    else:
+        current_app.logger.info(
+            f'Anonymous downloaded {len(tasks)} tasks for date {filter_date}'
+        )
+
     return jsonify({
         'status': 'success',
         'data': {

@@ -334,10 +334,14 @@ def main():
         )
 
         # ── t_organization 去重（CardinalityViolation 根本修復）────────────────
-        # Oracle AIMS 設計：同一 unitid 存在兩筆，一筆 parentunitid=unitid（自我指向，
-        # 代表此 unit 為獨立實體的 master record），另一筆 parentunitid=真正父節點。
-        # PostgreSQL 要求 unitid 唯一，因此必須在 Oracle SQL 層以 ROW_NUMBER() 去重。
-        # 優先序：① 非自我指向（保留真實層級）> ② 非 '*' 父節點 > ③ unittype 字典序
+        # Oracle AIMS 設計：同一 unitid 存在多筆：
+        #   - 自我指向 (parentunitid=unitid)：master record，需丟棄
+        #   - 根節點 (parentunitid='*')：無父部門，保留但後續轉 NULL
+        #   - 正常層級 (parentunitid=真正父節點)：優先保留
+        # 優先序（明確單一 CASE，避免 '*' 與數字比較的歧義）：
+        #   0 = 正常層級（非自我指向 AND 非 '*'）← 最優先
+        #   1 = 根節點（parentunitid='*'）
+        #   2 = 自我指向（parentunitid=unitid）← 最低優先，丟棄
         org = pd.read_sql(
             f"""
             SELECT unitid, parentunitid, unitname, unittype
@@ -346,8 +350,11 @@ def main():
                        ROW_NUMBER() OVER (
                            PARTITION BY unitid
                            ORDER BY
-                               CASE WHEN parentunitid <> unitid THEN 0 ELSE 1 END,
-                               CASE WHEN parentunitid = '*'     THEN 1 ELSE 0 END,
+                               CASE
+                                   WHEN parentunitid = unitid THEN 2
+                                   WHEN parentunitid = '*'    THEN 1
+                                   ELSE 0
+                               END,
                                unittype
                        ) AS rn
                 FROM {ORA_PREFIX}t_organization
@@ -444,7 +451,19 @@ def main():
             f"  ⚠️  t_job: 略過 {null_mdate_count} 筆 mdate=NULL 的工單"
             f"（Oracle 未排定日期，不符合 NOT NULL 約束）"
         )
-    upsert_dataframe(jobs_valid, "t_job", pg_eng)
+
+    # ── ForeignKeyViolation 防護：t_job → t_equipment ────────────────────────
+    # t_job.equipmentid 受 FK 約束，若對應設備因 t_organization 孤兒而被過濾，
+    # 相關工單也必須一併排除，否則寫入時 PG 會報 FK 錯誤。
+    valid_equip_ids = set(equip_valid["id"].dropna().astype(str))
+    jobs_equip_valid = jobs_valid[jobs_valid["equipmentid"].astype(str).isin(valid_equip_ids)].copy()
+    equip_job_orphan_count = len(jobs_valid) - len(jobs_equip_valid)
+    if equip_job_orphan_count > 0:
+        logger.warning(
+            f"  ⚠️  t_job: 略過 {equip_job_orphan_count} 筆孤兒工單"
+            f"（equipmentid 未出現在 t_equipment，FK 防護）"
+        )
+    upsert_dataframe(jobs_equip_valid, "t_job", pg_eng)
     # inspection_result：不同步（量測結果僅由 App 巡檢員產生）
     # abnormal_cases  ：不同步（純 FEM 業務資料，Oracle AIMS 不存在此概念）
 

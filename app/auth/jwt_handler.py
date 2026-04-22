@@ -216,6 +216,45 @@ def token_required(f):
     return decorated
 
 
+def token_optional(f):
+    """
+    裝飾器: JWT Token 可選驗證（工廠 PDA 共用設備場景）
+
+    有提供有效 Token → current_user = HrAccount 物件（已登入）
+    未提供 Token    → current_user = None（匿名，仍可存取公開資料）
+
+    適用於：下載工單（首頁無須登入即可抓取所有工單）
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = JWTHandler.get_token_from_header()
+        kwargs['current_user'] = None
+        kwargs['token_payload'] = None
+        kwargs['token_will_expire_soon'] = False
+
+        if token:
+            payload, error = JWTHandler.decode_token(token)
+            if payload and payload.get('type') == 'access':
+                # 驗證黑名單
+                jti = payload.get('jti')
+                blacklisted = False
+                if jti:
+                    from app.services.token_blacklist import TokenBlacklistService
+                    blacklisted = TokenBlacklistService.is_blacklisted(jti)
+
+                if not blacklisted:
+                    from app.models.Mortor_user import HrAccount
+                    user = HrAccount.query.get(payload['user_id'])
+                    if user:
+                        kwargs['current_user'] = user
+                        kwargs['token_payload'] = payload
+                        kwargs['token_will_expire_soon'] = JWTHandler.is_token_expiring(payload)
+
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 def role_required(*allowed_roles):
     """
     裝飾器: 驗證使用者角色
