@@ -444,7 +444,19 @@ def main():
             f"  ⚠️  t_job: 略過 {null_mdate_count} 筆 mdate=NULL 的工單"
             f"（Oracle 未排定日期，不符合 NOT NULL 約束）"
         )
-    upsert_dataframe(jobs_valid, "t_job", pg_eng)
+
+    # ── ForeignKeyViolation 防護：t_job → t_equipment ────────────────────────
+    # t_job.equipmentid 受 FK 約束，若對應設備因 t_organization 孤兒而被過濾，
+    # 相關工單也必須一併排除，否則寫入時 PG 會報 FK 錯誤。
+    valid_equip_ids = set(equip_valid["id"].dropna().astype(str))
+    jobs_equip_valid = jobs_valid[jobs_valid["equipmentid"].astype(str).isin(valid_equip_ids)].copy()
+    equip_job_orphan_count = len(jobs_valid) - len(jobs_equip_valid)
+    if equip_job_orphan_count > 0:
+        logger.warning(
+            f"  ⚠️  t_job: 略過 {equip_job_orphan_count} 筆孤兒工單"
+            f"（equipmentid 未出現在 t_equipment，FK 防護）"
+        )
+    upsert_dataframe(jobs_equip_valid, "t_job", pg_eng)
     # inspection_result：不同步（量測結果僅由 App 巡檢員產生）
     # abnormal_cases  ：不同步（純 FEM 業務資料，Oracle AIMS 不存在此概念）
 
