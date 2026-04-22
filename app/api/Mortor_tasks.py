@@ -7,6 +7,7 @@ from app import db
 from app.models.Mortor_inspection import TJob
 from app.models.Mortor_equipment import TEquipment, EquitCheckItem
 from app.models.Mortor_user import HrAccount
+from app.models.Mortor_organization import TOrganization
 from app.auth.jwt_handler import token_required, token_optional
 from app.utils.decorators import log_request
 from app.utils.validators import Validator
@@ -124,10 +125,39 @@ def download_tasks(**kwargs):
             f'Anonymous downloaded {len(tasks)} tasks for date {filter_date}'
         )
 
+    # ── 補齊組織架構（t_organization）─────────────────────────────────────────
+    # 前端 APP 用於初始化部門篩選器，全量下載不分日期
+    orgs = TOrganization.query.all()
+    organizations_data = [
+        {
+            'unitid': o.unitid,
+            'parentunitid': o.parentunitid,
+            'unitname': o.unitname,
+            'unittype': o.unittype,
+        }
+        for o in orgs
+    ]
+
+    # ── 補齊人員帳號（hr_account）─────────────────────────────────────────────
+    # 前端 APP 用於離線 Local Login 的 PBKDF2 密碼驗證，全量下載
+    accounts = HrAccount.query.all()
+    hr_accounts_data = [
+        {
+            'id': a.id,
+            'name': a.name,
+            'organizationid': a.organizationid or '',
+            'email': a.email or '',
+            'password': a.password or '',
+        }
+        for a in accounts
+    ]
+
     return jsonify({
         'status': 'success',
         'data': {
             'tasks': tasks_data,
+            'organizations': organizations_data,
+            'hr_accounts': hr_accounts_data,
             'last_sync': datetime.utcnow().isoformat() + 'Z',
             'total_count': len(tasks),
             'synced_at': datetime.utcnow().isoformat() + 'Z'
