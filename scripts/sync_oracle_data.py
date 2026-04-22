@@ -385,7 +385,13 @@ def main():
     logger.info(f"  hr_account:     {len(hr_acc)} 筆")
 
     # ── Transform（轉換）─────────────────────────────────────────────────────
-    logger.info("🔄 [2/3] Transform：解析工單 grade / mterm...")
+    logger.info("🔄 [2/3] Transform：解析工單 grade / mterm 及清理 ForeignKey 參照...")
+    
+    # ▶ P2 修正：處理 Oracle 根節點 '*' 為 None (NULL)
+    # Oracle 用 '*' 代表無父節點，但 PostgreSQL FK 要求 NULL
+    org["parentunitid"] = org["parentunitid"].apply(lambda x: None if str(x).strip() == '*' else x)
+    hr_org["parentid"] = hr_org["parentid"].apply(lambda x: None if str(x).strip() == '*' else x)
+
     jobs_enriched = transform_jobs(jobs)
     logger.info(f"  成功解析工單: {len(jobs_enriched)} 筆")
     # ▶ P1 修正：不再建立 inspection_result 初始記錄
@@ -396,7 +402,18 @@ def main():
     logger.info("💾 [3/3] Load：依外鍵順序寫入 PostgreSQL（SCD Type 1 Upsert）...")
     # 外鍵依賴順序：組織/人員 → 設備 → 工單
     upsert_dataframe(org,           "t_organization",  pg_eng)
-    upsert_dataframe(equip,         "t_equipment",     pg_eng)
+
+    # ── ForeignKeyViolation 防護：t_equipment → t_organization ───────────────
+    valid_torg_ids = set(org["unitid"].dropna().astype(str))
+    equip_valid = equip[equip["unitid"].astype(str).isin(valid_torg_ids)].copy()
+    equip_orphan_count = len(equip) - len(equip_valid)
+    if equip_orphan_count > 0:
+        logger.warning(
+            f"  ⚠️  t_equipment: 略過 {equip_orphan_count} 筆孤兒紀錄"
+            f"（unitid 未出現在 t_organization，FK 防護）"
+        )
+    upsert_dataframe(equip_valid,   "t_equipment",     pg_eng)
+    
     upsert_dataframe(hr_org,        "hr_organization", pg_eng)
 
     # ── ForeignKeyViolation 防護：hr_account → hr_organization ───────────────
