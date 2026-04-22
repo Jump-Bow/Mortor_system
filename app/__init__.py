@@ -1,5 +1,5 @@
 """
-FEM 設備保養管理系統 - Application Factory
+馬達巡檢系統 - Application Factory
 Flask Application Initialization with Blueprint Registration
 """
 from flask import Flask, jsonify
@@ -109,7 +109,7 @@ def create_app(config_name: str = None) -> Flask:
             'UserLog': UserLog,
         }
     
-    app.logger.info(f'FEM Application started in {config_name} mode')
+    app.logger.info(f'Motor Inspection Application started in {config_name} mode')
     
     # Log Database Connection (Masked)
     db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', 'Not Set')
@@ -230,7 +230,7 @@ def setup_logging(app: Flask) -> None:
             app.logger.addHandler(stream_handler)
         
         app.logger.setLevel(log_level)
-        app.logger.info('FEM Application logging to stdout (Cloud Run JSON mode)')
+        app.logger.info('Motor Inspection Application logging to stdout (Cloud Run JSON mode)')
     else:
         # 本地開發：純文字格式，寫入 RotatingFileHandler
         os.makedirs('logs', exist_ok=True)
@@ -238,7 +238,7 @@ def setup_logging(app: Flask) -> None:
             app.config.get('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         )
         file_handler = RotatingFileHandler(
-            app.config.get('LOG_FILE', 'logs/fem.log'),
+            app.config.get('LOG_FILE', 'logs/motor_inspection.log'),
             maxBytes=10240000,  # 10MB
             backupCount=10
         )
@@ -246,7 +246,7 @@ def setup_logging(app: Flask) -> None:
         file_handler.setLevel(log_level)
         app.logger.addHandler(file_handler)
         app.logger.setLevel(log_level)
-        app.logger.info('FEM Application logging to file')
+        app.logger.info('Motor Inspection Application logging to file')
 
 
 def _validate_config(app: Flask) -> None:

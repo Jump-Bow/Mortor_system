@@ -1,18 +1,18 @@
-{
+﻿{
   "openapi": "3.0.0",
   "info": {
-    "title": "FEM 巡檢管理系統 API",
-    "description": "設施設備巡檢管理系統的 RESTful API 文件",
+    "title": "馬達巡檢系統 API",
+    "description": "設施設�?巡檢管�?系統??RESTful API ?�件",
     "version": "1.0.0",
     "contact": {
-      "name": "API 支援",
+      "name": "API ?�援",
       "email": "support@example.com"
     }
   },
   "servers": [
     {
       "url": "/api",
-      "description": "API 伺服器"
+      "description": "API 伺�???
     }
   ],
   "components": {
@@ -21,7 +21,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "輸入您的 JWT Token"
+        "description": "輸入?��? JWT Token"
       }
     },
     "schemas": {
@@ -34,7 +34,7 @@
           },
           "message": {
             "type": "string",
-            "example": "錯誤訊息"
+            "example": "?�誤訊息"
           }
         }
       },
@@ -47,7 +47,7 @@
           },
           "message": {
             "type": "string",
-            "example": "操作成功"
+            "example": "?��??��?"
           }
         }
       },
@@ -64,7 +64,7 @@
           },
           "full_name": {
             "type": "string",
-            "example": "系統管理員"
+            "example": "系統管�???
           },
           "email": {
             "type": "string",
@@ -99,7 +99,7 @@
           },
           "org_name": {
             "type": "string",
-            "example": "工廠一"
+            "example": "工�?一"
           },
           "parent_id": {
             "type": "string",
@@ -131,7 +131,7 @@
           },
           "shift": {
             "type": "string",
-            "enum": ["早班", "中班", "夜班"]
+            "enum": ["?�班", "中班", "夜班"]
           },
           "route": {
             "type": "object",
@@ -149,7 +149,7 @@
           },
           "status": {
             "type": "string",
-            "enum": ["未開始", "進行中", "已完成", "已逾期"]
+            "enum": ["?��?�?, "?��?�?, "已�???, "已逾�?"]
           }
         }
       }
@@ -162,44 +162,44 @@
   ],
   "tags": [
     {
-      "name": "認證",
-      "description": "使用者登入與身份認證"
+      "name": "認�?",
+      "description": "使用?�登?��?身份認�?"
     },
     {
-      "name": "使用者管理",
-      "description": "使用者帳號與權限管理"
+      "name": "使用?�管??,
+      "description": "使用?�帳?��?權�?管�?"
     },
     {
-      "name": "組織管理",
-      "description": "組織架構與路線管理"
+      "name": "組�?管�?",
+      "description": "組�??��??�路線管??
     },
     {
-      "name": "設施管理",
-      "description": "設施與設備管理"
+      "name": "設施管�?",
+      "description": "設施?�設?�管??
     },
     {
-      "name": "任務管理",
-      "description": "巡檢任務下載與管理"
+      "name": "任�?管�?",
+      "description": "巡檢任�?下�??�管??
     },
     {
-      "name": "結果上傳",
-      "description": "巡檢結果與照片上傳"
+      "name": "結�?上傳",
+      "description": "巡檢結�??�照?��???
     },
     {
-      "name": "巡檢查詢",
-      "description": "巡檢記錄查詢與統計"
+      "name": "巡檢?�詢",
+      "description": "巡檢記�??�詢?�統�?
     },
     {
-      "name": "系統日誌",
-      "description": "系統操作日誌查詢"
+      "name": "系統?��?",
+      "description": "系統?��??��??�詢"
     }
   ],
   "paths": {
     "/auth/login": {
       "post": {
-        "tags": ["認證"],
-        "summary": "使用者登入",
-        "description": "使用本地帳號或 Azure AD 進行身份驗證",
+        "tags": ["認�?"],
+        "summary": "使用?�登??,
+        "description": "使用?�地帳�???Azure AD ?��?身份驗�?",
         "security": [],
         "requestBody": {
           "required": true,
@@ -215,22 +215,22 @@
                   },
                   "username": {
                     "type": "string",
-                    "description": "使用者名稱（本地登入時必填）"
+                    "description": "使用?��?稱�??�地?�入?��?填�?"
                   },
                   "password": {
                     "type": "string",
-                    "description": "密碼（本地登入時必填）"
+                    "description": "密碼（本?�登?��?必填�?
                   },
                   "ad_token": {
                     "type": "string",
-                    "description": "Azure AD Token（Azure AD 登入時必填）"
+                    "description": "Azure AD Token（Azure AD ?�入?��?填�?"
                   }
                 },
                 "required": ["login_type"]
               },
               "examples": {
                 "local": {
-                  "summary": "本地登入",
+                  "summary": "?�地?�入",
                   "value": {
                     "login_type": "local",
                     "username": "admin",
@@ -238,7 +238,7 @@
                   }
                 },
                 "azure_ad": {
-                  "summary": "Azure AD 登入",
+                  "summary": "Azure AD ?�入",
                   "value": {
                     "login_type": "azure_ad",
                     "ad_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJS..."
@@ -250,7 +250,7 @@
         },
         "responses": {
           "200": {
-            "description": "登入成功",
+            "description": "?�入?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -262,7 +262,7 @@
                     },
                     "message": {
                       "type": "string",
-                      "example": "登入成功"
+                      "example": "?�入?��?"
                     },
                     "data": {
                       "type": "object",
@@ -286,7 +286,7 @@
             }
           },
           "401": {
-            "description": "認證失敗",
+            "description": "認�?失�?",
             "content": {
               "application/json": {
                 "schema": {
@@ -300,9 +300,9 @@
     },
     "/auth/refresh": {
       "post": {
-        "tags": ["認證"],
-        "summary": "刷新 Token",
-        "description": "使用 Refresh Token 取得新的 Access Token",
+        "tags": ["認�?"],
+        "summary": "?�新 Token",
+        "description": "使用 Refresh Token ?��??��? Access Token",
         "security": [],
         "requestBody": {
           "required": true,
@@ -323,7 +323,7 @@
         },
         "responses": {
           "200": {
-            "description": "Token 刷新成功",
+            "description": "Token ?�新?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -346,7 +346,7 @@
             }
           },
           "401": {
-            "description": "Token 無效",
+            "description": "Token ?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -360,12 +360,12 @@
     },
     "/auth/logout": {
       "post": {
-        "tags": ["認證"],
-        "summary": "使用者登出",
-        "description": "登出並撤銷當前 Token",
+        "tags": ["認�?"],
+        "summary": "使用?�登??,
+        "description": "?�出並撤?�當??Token",
         "responses": {
           "200": {
-            "description": "登出成功",
+            "description": "?�出?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -379,9 +379,9 @@
     },
     "/users/list": {
       "get": {
-        "tags": ["使用者管理"],
-        "summary": "取得使用者列表",
-        "description": "查詢所有使用者（需管理員權限）",
+        "tags": ["使用?�管??],
+        "summary": "?��?使用?��?�?,
+        "description": "?�詢?�?�使?�者�??�管�??��??��?",
         "parameters": [
           {
             "name": "role_id",
@@ -394,7 +394,7 @@
           {
             "name": "is_active",
             "in": "query",
-            "description": "是否啟用",
+            "description": "?�否?�用",
             "schema": {
               "type": "boolean"
             }
@@ -402,7 +402,7 @@
           {
             "name": "search",
             "in": "query",
-            "description": "搜尋關鍵字（使用者名稱或姓名）",
+            "description": "?��??�鍵字�?使用?��?稱�?姓�?�?,
             "schema": {
               "type": "string"
             }
@@ -410,7 +410,7 @@
           {
             "name": "page",
             "in": "query",
-            "description": "頁碼",
+            "description": "?�碼",
             "schema": {
               "type": "integer",
               "default": 1
@@ -419,7 +419,7 @@
           {
             "name": "per_page",
             "in": "query",
-            "description": "每頁筆數",
+            "description": "每�?筆數",
             "schema": {
               "type": "integer",
               "default": 20
@@ -428,7 +428,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得使用者列表",
+            "description": "?��??��?使用?��?�?,
             "content": {
               "application/json": {
                 "schema": {
@@ -471,7 +471,7 @@
             }
           },
           "403": {
-            "description": "權限不足",
+            "description": "權�?不足",
             "content": {
               "application/json": {
                 "schema": {
@@ -485,14 +485,14 @@
     },
     "/users/{user_id}": {
       "get": {
-        "tags": ["使用者管理"],
-        "summary": "取得使用者詳細資料",
+        "tags": ["使用?�管??],
+        "summary": "?��?使用?�詳細�???,
         "parameters": [
           {
             "name": "user_id",
             "in": "path",
             "required": true,
-            "description": "使用者 ID",
+            "description": "使用??ID",
             "schema": {
               "type": "integer"
             }
@@ -500,7 +500,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得使用者資料",
+            "description": "?��??��?使用?��???,
             "content": {
               "application/json": {
                 "schema": {
@@ -523,7 +523,7 @@
             }
           },
           "404": {
-            "description": "找不到使用者",
+            "description": "?��??�使?��?,
             "content": {
               "application/json": {
                 "schema": {
@@ -535,8 +535,8 @@
         }
       },
       "put": {
-        "tags": ["使用者管理"],
-        "summary": "更新使用者資料",
+        "tags": ["使用?�管??],
+        "summary": "?�新使用?��???,
         "parameters": [
           {
             "name": "user_id",
@@ -574,7 +574,7 @@
         },
         "responses": {
           "200": {
-            "description": "更新成功",
+            "description": "?�新?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -586,8 +586,8 @@
         }
       },
       "delete": {
-        "tags": ["使用者管理"],
-        "summary": "刪除使用者",
+        "tags": ["使用?�管??],
+        "summary": "?�除使用??,
         "parameters": [
           {
             "name": "user_id",
@@ -600,7 +600,7 @@
         ],
         "responses": {
           "200": {
-            "description": "刪除成功",
+            "description": "?�除?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -614,8 +614,8 @@
     },
     "/users/create": {
       "post": {
-        "tags": ["使用者管理"],
-        "summary": "建立新使用者",
+        "tags": ["使用?�管??],
+        "summary": "建�??�使?��?,
         "requestBody": {
           "required": true,
           "content": {
@@ -652,7 +652,7 @@
         },
         "responses": {
           "201": {
-            "description": "建立成功",
+            "description": "建�??��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -679,12 +679,12 @@
     },
     "/organizations/tree": {
       "get": {
-        "tags": ["組織管理"],
-        "summary": "取得組織樹狀結構",
-        "description": "取得完整的組織階層樹",
+        "tags": ["組�?管�?"],
+        "summary": "?��?組�?樹�?結�?",
+        "description": "?��?完整?��?織�?層樹",
         "responses": {
           "200": {
-            "description": "成功取得組織樹",
+            "description": "?��??��?組�?�?,
             "content": {
               "application/json": {
                 "schema": {
@@ -714,14 +714,14 @@
     },
     "/organizations/list": {
       "get": {
-        "tags": ["組織管理"],
-        "summary": "取得組織列表",
-        "description": "取得扁平化的組織列表",
+        "tags": ["組�?管�?"],
+        "summary": "?��?組�??�表",
+        "description": "?��??�平?��?組�??�表",
         "parameters": [
           {
             "name": "parent_id",
             "in": "query",
-            "description": "上層組織 ID",
+            "description": "上層組�? ID",
             "schema": {
               "type": "string"
             }
@@ -729,7 +729,7 @@
           {
             "name": "level",
             "in": "query",
-            "description": "組織層級",
+            "description": "組�?層�?",
             "schema": {
               "type": "integer"
             }
@@ -737,7 +737,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得組織列表",
+            "description": "?��??��?組�??�表",
             "content": {
               "application/json": {
                 "schema": {
@@ -767,8 +767,8 @@
     },
     "/organizations/{org_id}/routes": {
       "get": {
-        "tags": ["組織管理"],
-        "summary": "取得組織的巡檢路線",
+        "tags": ["組�?管�?"],
+        "summary": "?��?組�??�巡檢路�?,
         "parameters": [
           {
             "name": "org_id",
@@ -781,7 +781,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得路線列表",
+            "description": "?��??��?路�??�表",
             "content": {
               "application/json": {
                 "schema": {
@@ -811,14 +811,14 @@
     },
     "/v1/facilities/tree": {
       "get": {
-        "tags": ["設施管理"],
-        "summary": "取得設施樹狀結構",
-        "description": "取得完整的設施階層樹",
+        "tags": ["設施管�?"],
+        "summary": "?��?設施樹�?結�?",
+        "description": "?��?完整?�設?��?層樹",
         "parameters": [
           {
             "name": "org_id",
             "in": "query",
-            "description": "組織 ID（可選，用於篩選特定組織的設施）",
+            "description": "組�? ID（可?��??�於篩選?��?組�??�設?��?",
             "schema": {
               "type": "string"
             }
@@ -826,7 +826,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得設施樹",
+            "description": "?��??��?設施�?,
             "content": {
               "application/json": {
                 "schema": {
@@ -859,14 +859,14 @@
     },
     "/v1/facilities/list": {
       "get": {
-        "tags": ["設施管理"],
-        "summary": "取得設施列表",
-        "description": "取得扁平化的設施列表",
+        "tags": ["設施管�?"],
+        "summary": "?��?設施?�表",
+        "description": "?��??�平?��?設施?�表",
         "parameters": [
           {
             "name": "org_id",
             "in": "query",
-            "description": "組織 ID",
+            "description": "組�? ID",
             "schema": {
               "type": "string"
             }
@@ -882,7 +882,7 @@
           {
             "name": "facility_type",
             "in": "query",
-            "description": "設施類型",
+            "description": "設施類�?",
             "schema": {
               "type": "string"
             }
@@ -890,7 +890,7 @@
           {
             "name": "page",
             "in": "query",
-            "description": "頁碼",
+            "description": "?�碼",
             "schema": {
               "type": "integer",
               "default": 1
@@ -899,7 +899,7 @@
           {
             "name": "page_size",
             "in": "query",
-            "description": "每頁筆數",
+            "description": "每�?筆數",
             "schema": {
               "type": "integer",
               "default": 20
@@ -908,7 +908,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得設施列表",
+            "description": "?��??��?設施?�表",
             "content": {
               "application/json": {
                 "schema": {
@@ -941,8 +941,8 @@
     },
     "/v1/facilities/{facility_id}": {
       "get": {
-        "tags": ["設施管理"],
-        "summary": "取得設施詳情",
+        "tags": ["設施管�?"],
+        "summary": "?��?設施詳�?",
         "parameters": [
           {
             "name": "facility_id",
@@ -956,7 +956,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得設施詳情",
+            "description": "?��??��?設施詳�?",
             "content": {
               "application/json": {
                 "schema": {
@@ -979,7 +979,7 @@
             }
           },
           "404": {
-            "description": "設施不存在",
+            "description": "設施不�???,
             "content": {
               "application/json": {
                 "schema": {
@@ -993,8 +993,8 @@
     },
     "/v1/facilities/{facility_id}/equipment": {
       "get": {
-        "tags": ["設施管理"],
-        "summary": "取得設施下的設備",
+        "tags": ["設施管�?"],
+        "summary": "?��?設施下�?設�?",
         "parameters": [
           {
             "name": "facility_id",
@@ -1008,7 +1008,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得設備列表",
+            "description": "?��??��?設�??�表",
             "content": {
               "application/json": {
                 "schema": {
@@ -1038,11 +1038,11 @@
     },
     "/v1/facilities/equipment/all": {
       "get": {
-        "tags": ["設施管理"],
-        "summary": "取得所有設備列表",
+        "tags": ["設施管�?"],
+        "summary": "?��??�?�設?��?�?,
         "responses": {
           "200": {
-            "description": "成功取得所有設備",
+            "description": "?��??��??�?�設??,
             "content": {
               "application/json": {
                 "schema": {
@@ -1072,14 +1072,14 @@
     },
     "/tasks/download": {
       "get": {
-        "tags": ["任務管理"],
-        "summary": "下載巡檢任務",
-        "description": "下載指派給使用者的巡檢任務（含完整路線資料）",
+        "tags": ["任�?管�?"],
+        "summary": "下�?巡檢任�?",
+        "description": "下�??�派給使?�者�?巡檢任�?（含完整路�?資�?�?,
         "parameters": [
           {
             "name": "user_id",
             "in": "query",
-            "description": "使用者 ID（可選，預設為當前使用者）",
+            "description": "使用??ID（可?��??�設?�當?�使?�者�?",
             "schema": {
               "type": "integer"
             }
@@ -1087,7 +1087,7 @@
           {
             "name": "date",
             "in": "query",
-            "description": "指定日期（格式：YYYY-MM-DD）",
+            "description": "?��??��?（格式�?YYYY-MM-DD�?,
             "schema": {
               "type": "string",
               "format": "date"
@@ -1096,7 +1096,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功下載任務",
+            "description": "?��?下�?任�?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1130,9 +1130,9 @@
     },
     "/tasks/list": {
       "get": {
-        "tags": ["任務管理"],
-        "summary": "取得任務列表",
-        "description": "查詢巡檢任務列表",
+        "tags": ["任�?管�?"],
+        "summary": "?��?任�??�表",
+        "description": "?�詢巡檢任�??�表",
         "parameters": [
           {
             "name": "user_id",
@@ -1146,7 +1146,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["未開始", "進行中", "已完成", "已逾期"]
+              "enum": ["?��?�?, "?��?�?, "已�???, "已逾�?"]
             }
           },
           {
@@ -1184,7 +1184,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得任務列表",
+            "description": "?��??��?任�??�表",
             "content": {
               "application/json": {
                 "schema": {
@@ -1217,9 +1217,9 @@
     },
     "/results/upload": {
       "post": {
-        "tags": ["結果上傳"],
-        "summary": "上傳巡檢結果",
-        "description": "批次上傳巡檢結果與照片",
+        "tags": ["結�?上傳"],
+        "summary": "上傳巡檢結�?",
+        "description": "?�次上傳巡檢結�??�照??,
         "requestBody": {
           "required": true,
           "content": {
@@ -1246,7 +1246,7 @@
                         },
                         "result_status": {
                           "type": "string",
-                          "enum": ["正常", "異常", "未檢查"]
+                          "enum": ["�?��", "?�常", "?�檢??]
                         },
                         "is_abnormal": {
                           "type": "boolean"
@@ -1274,11 +1274,11 @@
                             "properties": {
                               "photo_data": {
                                 "type": "string",
-                                "description": "Base64 編碼的圖片資料"
+                                "description": "Base64 編碼?��??��???
                               },
                               "photo_type": {
                                 "type": "string",
-                                "enum": ["正常", "異常"]
+                                "enum": ["�?��", "?�常"]
                               }
                             }
                           }
@@ -1294,7 +1294,7 @@
         },
         "responses": {
           "200": {
-            "description": "上傳成功",
+            "description": "上傳?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1330,9 +1330,9 @@
     },
     "/results/upload_photo": {
       "post": {
-        "tags": ["結果上傳"],
-        "summary": "上傳檢查照片",
-        "description": "上傳單張檢查照片（支援 multipart/form-data）",
+        "tags": ["結�?上傳"],
+        "summary": "上傳檢查?��?",
+        "description": "上傳?�張檢查?��?（支??multipart/form-data�?,
         "requestBody": {
           "required": true,
           "content": {
@@ -1349,7 +1349,7 @@
                   },
                   "photo_type": {
                     "type": "string",
-                    "enum": ["正常", "異常"]
+                    "enum": ["�?��", "?�常"]
                   }
                 },
                 "required": ["result_id", "photo", "photo_type"]
@@ -1359,7 +1359,7 @@
         },
         "responses": {
           "200": {
-            "description": "照片上傳成功",
+            "description": "?��?上傳?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1389,14 +1389,14 @@
     },
     "/inspection/statistics": {
       "get": {
-        "tags": ["巡檢查詢"],
-        "summary": "取得巡檢統計資料",
-        "description": "取得儀表板統計資訊",
+        "tags": ["巡檢?�詢"],
+        "summary": "?��?巡檢統�?資�?",
+        "description": "?��??�表板統�?資�?",
         "parameters": [
           {
             "name": "date",
             "in": "query",
-            "description": "查詢日期（預設為今日）",
+            "description": "?�詢?��?（�?設為今日�?,
             "schema": {
               "type": "string",
               "format": "date"
@@ -1405,7 +1405,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得統計資料",
+            "description": "?��??��?統�?資�?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1435,9 +1435,9 @@
     },
     "/inspection/records": {
       "get": {
-        "tags": ["巡檢查詢"],
-        "summary": "查詢巡檢記錄",
-        "description": "查詢歷史巡檢記錄",
+        "tags": ["巡檢?�詢"],
+        "summary": "?�詢巡檢記�?",
+        "description": "?�詢歷史巡檢記�?",
         "parameters": [
           {
             "name": "org_id",
@@ -1481,7 +1481,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["正常", "異常", "未檢查"]
+              "enum": ["�?��", "?�常", "?�檢??]
             }
           },
           {
@@ -1503,7 +1503,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得巡檢記錄",
+            "description": "?��??��?巡檢記�?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1536,16 +1536,16 @@
     },
     "/inspection/abnormal_tracking": {
       "get": {
-        "tags": ["巡檢查詢"],
-        "summary": "查詢異常追蹤",
-        "description": "查詢異常追蹤記錄",
+        "tags": ["巡檢?�詢"],
+        "summary": "?�詢?�常追蹤",
+        "description": "?�詢?�常追蹤記�?",
         "parameters": [
           {
             "name": "status",
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["待處理", "處理中", "已完成", "已關閉"]
+              "enum": ["待�???, "?��?�?, "已�???, "已�???]
             }
           },
           {
@@ -1583,7 +1583,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得異常追蹤記錄",
+            "description": "?��??��??�常追蹤記�?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1616,9 +1616,9 @@
     },
     "/aims/orders/query": {
       "get": {
-        "tags": ["AIMS整合"],
-        "summary": "查詢 AIMS 工單",
-        "description": "從 AIMS 系統查詢工單資料",
+        "tags": ["AIMS?��?"],
+        "summary": "?�詢 AIMS 工單",
+        "description": "�?AIMS 系統?�詢工單資�?",
         "parameters": [
           {
             "name": "org_id",
@@ -1685,7 +1685,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得工單資料",
+            "description": "?��??��?工單資�?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1718,9 +1718,9 @@
     },
     "/aims/orders/sync": {
       "post": {
-        "tags": ["AIMS整合"],
-        "summary": "同步 AIMS 工單",
-        "description": "將 AIMS 工單同步到本地資料庫",
+        "tags": ["AIMS?��?"],
+        "summary": "?�步 AIMS 工單",
+        "description": "�?AIMS 工單?�步?�本?��??�庫",
         "requestBody": {
           "required": true,
           "content": {
@@ -1747,7 +1747,7 @@
         },
         "responses": {
           "200": {
-            "description": "同步成功",
+            "description": "?�步?��?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1777,9 +1777,9 @@
     },
     "/system_logs/list": {
       "get": {
-        "tags": ["系統日誌"],
-        "summary": "查詢系統日誌",
-        "description": "查詢系統操作日誌（需管理員權限）",
+        "tags": ["系統?��?"],
+        "summary": "?�詢系統?��?",
+        "description": "?�詢系統?��??��?（�?管�??��??��?",
         "parameters": [
           {
             "name": "user_id",
@@ -1830,7 +1830,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得日誌列表",
+            "description": "?��??��??��??�表",
             "content": {
               "application/json": {
                 "schema": {
@@ -1863,14 +1863,14 @@
     },
     "/system_logs/statistics": {
       "get": {
-        "tags": ["系統日誌"],
-        "summary": "取得日誌統計",
-        "description": "取得系統日誌統計資訊",
+        "tags": ["系統?��?"],
+        "summary": "?��??��?統�?",
+        "description": "?��?系統?��?統�?資�?",
         "parameters": [
           {
             "name": "days",
             "in": "query",
-            "description": "統計天數",
+            "description": "統�?天數",
             "schema": {
               "type": "integer",
               "default": 7
@@ -1879,7 +1879,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功取得統計資料",
+            "description": "?��??��?統�?資�?",
             "content": {
               "application/json": {
                 "schema": {
@@ -1912,3 +1912,4 @@
     }
   }
 }
+
