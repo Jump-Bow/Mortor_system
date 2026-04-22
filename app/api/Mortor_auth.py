@@ -212,11 +212,22 @@ def login():
         if not tenant_id or not client_id:
             return jsonify({'status': 'error', 'message': 'Azure AD 認證未設定，請聯絡系統管理員'}), 503
 
-        # Azure AD UPN 格式：員工編號@公司域名（可由環境變數設定）
+        # Azure AD UPN 格式：微軟 API 嚴格要求必須是真實的 UPN（通常是員工信箱）。
+        # 優化策略：
+        # 1. 優先從本地資料庫 (hr_account) 找尋這個員工編號對應的真實 Email。
+        # 2. 如果資料庫沒有 Email，才退而求其次用「帳號 + 預設網域」硬拼。
+        from app.models.Mortor_user import HrAccount
         upn_domain = current_app.config.get('AZURE_UPN_DOMAIN', '')
-        upn = ad_username if '@' in ad_username else (
-            f"{ad_username}@{upn_domain}" if upn_domain else ad_username
-        )
+        upn = ad_username
+        
+        if '@' not in ad_username:
+            user_info = HrAccount.query.filter_by(id=ad_username).first()
+            if user_info and user_info.email and '@' in user_info.email:
+                upn = user_info.email
+                current_app.logger.info(f"AD ROPC: 將員工編號 {ad_username} 轉換為真實 UPN {upn}")
+            else:
+                # 找不到真實信箱，只好用硬拼的
+                upn = f"{ad_username}@{upn_domain}" if upn_domain else ad_username
 
         token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
         try:
