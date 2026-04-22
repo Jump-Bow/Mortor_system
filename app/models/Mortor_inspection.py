@@ -3,14 +3,18 @@ Inspection Related Models
 巡檢相關資料模型
 """
 from app import db
+from sqlalchemy import ForeignKeyConstraint
 
 
 class TJob(db.Model):
     """巡檢工單模型 (t_job)"""
     __tablename__ = 't_job'
     
+    # 複合主鍵 (actid, equipmentid)：對應 Oracle AIMS 設計
+    # Oracle 的一張工單（actid）可對應多台設備，每台一行，
+    # 真實唯一識別 = (actid, equipmentid)
     actid = db.Column(db.String(48), primary_key=True, comment='工單ID')
-    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), index=True, comment='設備編號')
+    equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), primary_key=True, index=True, comment='設備編號')
     mdate = db.Column(db.String(8), nullable=False, index=True, comment='開始日期')  # 首頁統計按日期查詢
     act_desc = db.Column(db.String(2000), comment='工單內容')
     act_key = db.Column(db.String(30), comment='工單編號')
@@ -80,8 +84,17 @@ class TJob(db.Model):
 class InspectionResult(db.Model):
     """巡檢結果模型 (inspection_result)"""
     __tablename__ = 'inspection_result'
+    __table_args__ = (
+        # 複合外鍵：對應 t_job 的複合主鍵 (actid, equipmentid)
+        ForeignKeyConstraint(
+            ['actid', 'equipmentid'],
+            ['t_job.actid', 't_job.equipmentid'],
+            ondelete='CASCADE'
+        ),
+    )
 
-    actid = db.Column(db.String(48), db.ForeignKey('t_job.actid'), primary_key=True, comment='工單ID')
+    # actid 不再有單獨 FK（已由 __table_args__ 的 ForeignKeyConstraint 涵蓋）
+    actid = db.Column(db.String(48), primary_key=True, comment='工單ID')
     item_id = db.Column(db.String(48), db.ForeignKey('equit_check_item.item_id'), primary_key=True, comment='項目ID')
     equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), primary_key=True, comment='設備編號')
     measured_value = db.Column(db.String(48), comment='量測值')

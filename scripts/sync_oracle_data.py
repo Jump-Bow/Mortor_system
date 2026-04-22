@@ -173,10 +173,10 @@ TABLE_UPSERT_CONFIG = {
         "update": ["name", "organizationid", "email"],
     },
     "t_job": {
-        "key": ["actid"],
-        # 工單一旦存在，僅補齊可能在 AIMS 側更新的欄位
-        # 絕對不更新 equipmentid / mdate（App 端量測結果依賴此關聯）
-        # act_mem / act_mem_id 為 FEM 自訂欄位，Oracle 原生不存在，不同步
+        "key": ["actid", "equipmentid"],
+        # 工單複合主鍵：對應 Oracle AIMS 設備，一張工單可對應多台設備
+        # actid='工單號' + equipmentid='設備編號' = 唯一紀錄
+        # 工單一旦存在，僅補齊可能在 AIMS 側更新的 act_key
         "update": ["act_key"],
     },
 }
@@ -405,6 +405,7 @@ def main():
 
     jobs_enriched = transform_jobs(jobs)
     logger.info(f"  成功解析工單: {len(jobs_enriched)} 筆")
+
     # ▶ P1 修正：不再建立 inspection_result 初始記錄
     #   理由：量測結果的建立權完全歸屬 App 巡檢員
     #          若預建 is_out_of_spec=0 的空行，App 正常值（0）將被 ON CONFLICT DO NOTHING 吞掉
