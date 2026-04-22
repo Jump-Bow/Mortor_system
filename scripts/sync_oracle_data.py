@@ -334,10 +334,14 @@ def main():
         )
 
         # ── t_organization 去重（CardinalityViolation 根本修復）────────────────
-        # Oracle AIMS 設計：同一 unitid 存在兩筆，一筆 parentunitid=unitid（自我指向，
-        # 代表此 unit 為獨立實體的 master record），另一筆 parentunitid=真正父節點。
-        # PostgreSQL 要求 unitid 唯一，因此必須在 Oracle SQL 層以 ROW_NUMBER() 去重。
-        # 優先序：① 非自我指向（保留真實層級）> ② 非 '*' 父節點 > ③ unittype 字典序
+        # Oracle AIMS 設計：同一 unitid 存在多筆：
+        #   - 自我指向 (parentunitid=unitid)：master record，需丟棄
+        #   - 根節點 (parentunitid='*')：無父部門，保留但後續轉 NULL
+        #   - 正常層級 (parentunitid=真正父節點)：優先保留
+        # 優先序（明確單一 CASE，避免 '*' 與數字比較的歧義）：
+        #   0 = 正常層級（非自我指向 AND 非 '*'）← 最優先
+        #   1 = 根節點（parentunitid='*'）
+        #   2 = 自我指向（parentunitid=unitid）← 最低優先，丟棄
         org = pd.read_sql(
             f"""
             SELECT unitid, parentunitid, unitname, unittype
@@ -346,8 +350,11 @@ def main():
                        ROW_NUMBER() OVER (
                            PARTITION BY unitid
                            ORDER BY
-                               CASE WHEN parentunitid <> unitid THEN 0 ELSE 1 END,
-                               CASE WHEN parentunitid = '*'     THEN 1 ELSE 0 END,
+                               CASE
+                                   WHEN parentunitid = unitid THEN 2
+                                   WHEN parentunitid = '*'    THEN 1
+                                   ELSE 0
+                               END,
                                unittype
                        ) AS rn
                 FROM {ORA_PREFIX}t_organization
