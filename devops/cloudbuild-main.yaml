@@ -151,6 +151,40 @@ steps:
           --max-retries 1
         echo "[5] ✅ motor-oracle-sync 部署完成（手動至 GCP Console 觸發執行）"
 
+  # ==============================================================================
+  # 步驟 6: 部署巡檢項目種子資料 Job (motor-seed-items)
+  # ==============================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Seed Items Job'
+    waitFor:
+      - 'Push image'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== [6] 部署 Seed Items Job: motor-seed-items ==="
+        echo "[6] 時間: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        echo "[6] Image: ${_IMAGE_PATH}:${SHORT_SHA}"
+        gcloud run jobs deploy motor-seed-items \
+          --image ${_IMAGE_PATH}:${SHORT_SHA} \
+          --service-account "${_DEPLOY_SERVICE_ACCOUNT}" \
+          --project "${_DEPLOY_PROJECT_ID}" \
+          --region ${_LOCATION} \
+          --command "python" \
+          --args "scripts/seed_check_items.py" \
+          --network "${_VPC_NETWORK}" \
+          --subnet "${_VPC_SUBNET}" \
+          --vpc-egress "private-ranges-only" \
+          --set-env-vars "FLASK_ENV=production" \
+          --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest" \
+          --max-retries 0
+        echo "[6] ✅ motor-seed-items 部署完成，開始執行..."
+        gcloud run jobs execute motor-seed-items \
+          --project "${_DEPLOY_PROJECT_ID}" \
+          --region ${_LOCATION} \
+          --wait
+        echo "[6] ✅ motor-seed-items 執行完畢"
+
 # ==============================================================================
 # 設定與環境變數
 # ==============================================================================
