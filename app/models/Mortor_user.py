@@ -58,6 +58,18 @@ class HrAccount(UserMixin, db.Model):
         """驗證密碼"""
         if not self.password:
             return False
+            
+        # 兼容舊版系統/手動建檔的明文密碼
+        # 如果資料庫中的密碼不是標準的 Werkzeug Hash 格式 (不包含 $ 符號或 pbkdf2)
+        # 則退回使用直接明文比對
+        if not self.password.startswith('pbkdf2:'):
+            if self.password == password:
+                # 若明文比對成功，代表這是一個舊的明文密碼。
+                # 理論上應該在這裡自動把它升級成 Hash 並存回 DB，
+                # 但為避免在單純讀取流程中觸發非預期的寫入，此處先維持相容性放行。
+                return True
+            return False
+            
         return check_password_hash(self.password, password)
     
     def to_dict(self, include_sensitive: bool = False):
