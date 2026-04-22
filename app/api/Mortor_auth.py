@@ -191,33 +191,65 @@ def login():
             }), 401
 
     elif login_type == 'azure_ad':
-        # Azure AD: 導引前端至 Azure AD 授權頁面
-        if not AzureADHandler.is_enabled():
-            return jsonify({
-                'status': 'error',
-                'message': 'Azure AD 認證未啟用'
-            }), 503
+        # ── Azure AD ROPC（Resource Owner Password Credentials）流程 ─────────────
+        # 公司要求：APP 直接丟帳號/密碼給 Server，由 Server 去與 Azure AD 認證。
+        # 流程：APP → POST /login {username, password, login_type: azure_ad}
+        #       Server → POST https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token
+        #       Azure AD → 成功 → Server 產生自己的 JWT → 回傳給 APP
+        import requests as _requests
 
-        auth_url, error = AzureADHandler.get_auth_url()
+        error = Validator.validate_required_fields(data, ['username', 'password'])
         if error:
-            return jsonify({
-                'status': 'error',
-                'message': error
-            }), 500
+            return jsonify({'status': 'error', 'message': error}), 400
 
-        return jsonify({
-            'status': 'success',
-            'message': '請導向 Azure AD 登入頁面',
-            'data': {
-                'auth_url': auth_url
-            }
-        }), 200
-    
+        ad_username = data['username']
+        ad_password = data['password']
+
+        tenant_id = current_app.config.get('AZURE_TENANT_ID', '')
+        client_id = current_app.config.get('AZURE_CLIENT_ID', '')
+        client_secret = current_app.config.get('AZURE_CLIENT_SECRET', '')
+
+        if not tenant_id or not client_id:
+            return jsonify({'status': 'error', 'message': 'Azure AD 認證未設定，請聯絡系統管理員'}), 503
+
+        # Azure AD UPN 格式：員工編號@公司域名（可由環境變數設定）
+        upn_domain = current_app.config.get('AZURE_UPN_DOMAIN', '')
+        upn = ad_username if '@' in ad_username else (
+            f"{ad_username}@{upn_domain}" if upn_domain else ad_username
+        )
+
+        token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+        try:
+            ad_resp = _requests.post(token_url, data={
+                'grant_type':    'password',
+                'client_id':     client_id,
+                'client_secret': client_secret,
+                'username':      upn,
+                'password':      ad_password,
+                'scope':         'openid profile email',
+            }, timeout=10)
+        except Exception as e:
+            current_app.logger.error(f'Azure AD ROPC request failed: {e}')
+            return jsonify({'status': 'error', 'message': 'AD 伺服器連線失敗'}), 503
+
+        if ad_resp.status_code != 200:
+            ad_error = ad_resp.json().get('error_description', 'AD 認證失敗')
+            current_app.logger.warning(f'Azure AD ROPC failed for {upn}: {ad_error}')
+            return jsonify({'status': 'error', 'message': '帳號或密碼錯誤（AD）'}), 401
+
+        # 以員工編號（不含 domain）查詢本地資料庫
+        employee_id = ad_username.split('@')[0]
+        user = HrAccount.query.filter_by(id=employee_id).first()
+        if not user:
+            current_app.logger.warning(f'Azure AD user not found in hr_account: {employee_id}')
+            return jsonify({'status': 'error', 'message': '此帳號未授權使用本系統，請聯絡管理員'}), 403
+
     else:
         return jsonify({
             'status': 'error',
             'message': '不支援的登入類型'
         }), 400
+
     
     # Generate JWT tokens
     access_token, refresh_token = JWTHandler.generate_token(

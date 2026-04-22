@@ -44,6 +44,9 @@ class Config:
     AZURE_AUTHORITY = f"https://login.microsoftonline.com/{os.getenv('AZURE_TENANT_ID', '')}"
     AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', 'http://localhost:5000/api/v1/auth/azure/callback')
     AZURE_SCOPE = ["User.Read"]
+    # UPN 域名：用於 ROPC 流程，員工輸入編號 I0001 → 轉為 I0001@{AZURE_UPN_DOMAIN}
+    # 例如：mail.chimei.com.tw（請由公司 IT 確認）
+    AZURE_UPN_DOMAIN = os.getenv('AZURE_UPN_DOMAIN', '')
     
     # AIMS Integration
     USE_MOCK_AIMS = os.getenv('USE_MOCK_AIMS', 'true').lower() == 'true'
