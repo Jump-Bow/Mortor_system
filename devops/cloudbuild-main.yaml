@@ -83,7 +83,7 @@ steps:
           --network "${_VPC_NETWORK}" \
           --subnet "${_VPC_SUBNET}" \
           --vpc-egress "all-traffic" \
-          --set-env-vars "FLASK_ENV=production,USE_AZURE_AD=true,CORS_ORIGIN_1=https://eq-inspect.chimei.com.tw" \
+          --set-env-vars "FLASK_ENV=production,USE_AZURE_AD=true,AZURE_UPN_DOMAIN=mail.chimei.com.tw,CORS_ORIGIN_1=https://eq-inspect.chimei.com.tw" \
           --set-secrets "PROD_DB_SERVER=FM_DB_SERVER:latest,PROD_DB_PORT=FM_DB_PORT:latest,PROD_DB_NAME=FM_DB_NAME:latest,PROD_DB_USER=FM_DB_USER:latest,PROD_DB_PASSWORD=FM_DB_PASS:latest,SECRET_KEY=FM_SECRET_KEY:latest,JWT_SECRET_KEY=FM_JWT_SECRET_KEY:latest,AZURE_CLIENT_ID=FM_AZURE_CLIENT_ID:latest,AZURE_CLIENT_SECRET=FM_AZURE_CLIENT_SECRET:latest,AZURE_TENANT_ID=FM_AZURE_TENANT_ID:latest,AZURE_REDIRECT_URI=FM_AZURE_REDIRECT_URI:latest" \
           --allow-unauthenticated
         echo "[3] ✅ motor-server 部署完成"
