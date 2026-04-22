@@ -452,7 +452,7 @@ def main():
                 logger.info(f"  hr_account: 發現 {len(null_pwd_users)} 筆帳號無密碼，初始化為員工編號")
                 for row in null_pwd_users:
                     uid = row[0]
-                    hashed = generate_password_hash(str(uid))
+                    hashed = generate_password_hash(str(uid), method='pbkdf2:sha256')
                     conn.execute(
                         sa.text("UPDATE hr_account SET password = :pwd WHERE id = :uid"),
                         {"pwd": hashed, "uid": uid}
