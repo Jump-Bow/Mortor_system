@@ -206,9 +206,15 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, engine: sa.Engine) -> No
     key_cols    = config["key"]
     update_cols = config["update"]
 
-    # 只保留資料表定義中相關的欄位，避免 DataFrame 有多餘欄位出錯
-    relevant_cols = key_cols + [c for c in update_cols if c in df.columns]
-    df = df[[c for c in relevant_cols if c in df.columns]].copy()
+    # ── 先 autoload PG 資料表結構，再過濾 DataFrame ───────────────────────────
+    # 修正：INSERT 應包含 PG 資料表所有有值的欄位（確保 NOT NULL 欄位有值）
+    # ON CONFLICT DO UPDATE 只更新 update_cols 指定欄位，不影響既有業務資料。
+    # 舊作法只保留 key+update_cols，導致 NOT NULL 欄位（如 mdate）被丟棄而報錯。
+    meta  = sa.MetaData()
+    table = sa.Table(table_name, meta, autoload_with=engine)
+    pg_col_names = {col.name for col in table.columns}
+    # 只保留 PG 資料表中存在的欄位，過濾 DataFrame 的多餘欄位（如 Oracle 原生計算欄）
+    df = df[[c for c in df.columns if c in pg_col_names]].copy()
 
     # ── CardinalityViolation 防護 ────────────────────────────────────────────
     # PostgreSQL ON CONFLICT DO UPDATE 不允許同批次對同一行 UPDATE 兩次。
@@ -224,8 +230,6 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, engine: sa.Engine) -> No
         logger.warning(f"  ⚠️  {table_name}: 無有效紀錄，跳過")
         return
 
-    meta    = sa.MetaData()
-    table   = sa.Table(table_name, meta, autoload_with=engine)
     stmt    = pg_insert(table).values(records)
 
     # ON CONFLICT DO UPDATE — 只更新有差異的欄位
