@@ -9,7 +9,8 @@ class AbnormalCases(db.Model):
     """異常追蹤模型 (abnormal_cases) - is_processed 加索引供 dashboard 統計"""
     __tablename__ = 'abnormal_cases'
     
-    actid = db.Column(db.String(48), db.ForeignKey('t_job.actid'), primary_key=True, comment='工單ID')
+    # 不再單獨綁定 ForeignKey，統一於 __table_args__ 宣告複合鍵
+    actid = db.Column(db.String(48), primary_key=True, comment='工單ID')
     equipmentid = db.Column(db.String(48), db.ForeignKey('t_equipment.id'), primary_key=True, comment='設備編號')
     item_id = db.Column(db.String(48), db.ForeignKey('equit_check_item.item_id'), primary_key=True, comment='項目ID')
     measured_value = db.Column(db.String(48), comment='量測值')
@@ -22,8 +23,13 @@ class AbnormalCases(db.Model):
     # Relationships
     responsible_user = db.relationship('HrAccount', foreign_keys=[processed_memid])
     
-    # Composite foreign key relationship to InspectionResult (三欄複合 PK 完整對應)
+    # Composite foreign key relationship
     __table_args__ = (
+        db.ForeignKeyConstraint(
+            ['actid', 'equipmentid'],
+            ['t_job.actid', 't_job.equipmentid'],
+            ondelete='CASCADE'
+        ),
         db.ForeignKeyConstraint(
             ['actid', 'equipmentid', 'item_id'],
             ['inspection_result.actid', 'inspection_result.equipmentid', 'inspection_result.item_id']
