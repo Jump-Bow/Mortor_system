@@ -168,13 +168,26 @@ def download_tasks(**kwargs):
             f'Anonymous downloaded {len(tasks)} tasks for date {filter_date}'
         )
 
+    # ── 查詢所有人員帳號（供 APP 儲存至本地用於離線登入）─────────────────────
+    hr_accounts_data = [
+        {
+            'id':             u.id,
+            'name':           u.name,
+            'organizationid': u.organizationid,
+            'email':          u.email or '',
+            'password':       u.password or '',  # 離線 PBKDF2 對比用
+        }
+        for u in HrAccount.query.all()
+    ]
+
     return jsonify({
         'status': 'success',
         'data': {
             'tasks': tasks_data,
             'last_sync': datetime.utcnow().isoformat() + 'Z',
             'total_count': len(tasks),
-            'synced_at': datetime.utcnow().isoformat() + 'Z'
+            'synced_at': datetime.utcnow().isoformat() + 'Z',
+            'hr_accounts': hr_accounts_data,
         }
     }), 200
 
