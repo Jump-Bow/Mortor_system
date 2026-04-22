@@ -205,9 +205,10 @@ class ProductionConfig(Config):
     UPLOAD_PROVIDER = 'gcs'  # 在 Cloud Run 預設切換為 GCS
     
     # CORS - 生產環境僅允許正式域名
+    # eq-inspect.chimei.com.tw = GCP Internal LB (intellipatrol-lb) 對外 Domain
     CORS_ORIGINS = [
-        os.getenv('CORS_ORIGIN_1', 'https://fem.chimei.com'),
-        os.getenv('CORS_ORIGIN_2', ''),
+        os.getenv('CORS_ORIGIN_1', 'https://eq-inspect.chimei.com.tw'),
+        os.getenv('CORS_ORIGIN_2', ''),  # 備用（如需額外 Web 介面 Domain 可由環境變數注入）
     ]
 
 
