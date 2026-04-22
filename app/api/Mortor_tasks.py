@@ -282,7 +282,7 @@ def get_task_detail(task_id, **kwargs):
     """
     取得特定任務詳細資訊
     """
-    task = TJob.query.get(task_id)
+    task = TJob.query.filter_by(actid=task_id).first()
     
     if not task:
         return jsonify({
@@ -417,7 +417,7 @@ def update_task(task_id, **kwargs):
     """
     current_user = kwargs.get('current_user')
     
-    task = TJob.query.get(task_id)
+    task = TJob.query.filter_by(actid=task_id).first()
     
     if not task:
         return jsonify({
@@ -513,7 +513,7 @@ def delete_task(task_id, **kwargs):
     """
     current_user = kwargs.get('current_user')
     
-    task = TJob.query.get(task_id)
+    task = TJob.query.filter_by(actid=task_id).first()
     
     if not task:
         return jsonify({

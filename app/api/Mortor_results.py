@@ -54,10 +54,15 @@ def upload_results(**kwargs):
         }), 400
     
     actid = data['actid']
+    equipmentid = data.get('equipmentid')  # App 須同時提供 equipmentid（與複合主鍵對齊）
     results = data['results']
     
-    # Verify task exists
-    task = TJob.query.get(actid)
+    # Verify task exists — 使用複合主鍵精確查詢
+    if equipmentid:
+        task = TJob.query.filter_by(actid=actid, equipmentid=equipmentid).first()
+    else:
+        # 向下相容：若 App 未提供 equipmentid，取第一筆（舊版 App）
+        task = TJob.query.filter_by(actid=actid).first()
     if not task:
         return jsonify({
             'status': 'error',

@@ -173,10 +173,10 @@ TABLE_UPSERT_CONFIG = {
         "update": ["name", "organizationid", "email"],
     },
     "t_job": {
-        "key": ["actid"],
-        # 工單一旦存在，僅補齊可能在 AIMS 側更新的欄位
-        # 絕對不更新 equipmentid / mdate（App 端量測結果依賴此關聯）
-        # act_mem / act_mem_id 為 FEM 自訂欄位，Oracle 原生不存在，不同步
+        "key": ["actid", "equipmentid"],
+        # 工單複合主鍵：對應 Oracle AIMS 設備，一張工單可對應多台設備
+        # actid='工單號' + equipmentid='設備編號' = 唯一紀錄
+        # 工單一旦存在，僅補齊可能在 AIMS 側更新的 act_key
         "update": ["act_key"],
     },
 }
@@ -405,28 +405,6 @@ def main():
 
     jobs_enriched = transform_jobs(jobs)
     logger.info(f"  成功解析工單: {len(jobs_enriched)} 筆")
-
-    # ── Oracle actid 唯一化（第一性原理修正）────────────────────────────────
-    # Oracle AIMS 設計：同一工單號（actid）可對應多台設備，每台一行。
-    # 例：actid='1001', equipmentid='MAE05D31'
-    #     actid='1001', equipmentid='MAE05D32'  ← actid 重複！
-    # PostgreSQL t_job.actid 為單一主鍵，直接匯入會產生 CardinalityViolation。
-    # 解法：ETL Transform 階段合成唯一 actid = original_actid + "_" + equipmentid
-    # 系統封閉：App 下載到的 actid 即為合成值，上傳巡檢結果時使用同一 actid，FK 完整。
-    before_dedup = len(jobs_enriched)
-    jobs_enriched["actid"] = (
-        jobs_enriched["actid"].astype(str).str.strip()
-        + "_"
-        + jobs_enriched["equipmentid"].astype(str).str.strip()
-    )
-    # 合成後仍可能因 Oracle 重複資料有重複 → 取最後一筆（最新）
-    jobs_enriched = jobs_enriched.drop_duplicates(subset=["actid"], keep="last").copy()
-    after_dedup = len(jobs_enriched)
-    if before_dedup - after_dedup > 0:
-        logger.warning(
-            f"  ⚠️  t_job: actid 合成後仍有 {before_dedup - after_dedup} 筆重複（Oracle 資料品質問題），保留最後一筆"
-        )
-    logger.info(f"  actid 合成完成：{before_dedup} 筆 → {after_dedup} 筆唯一工單")
 
     # ▶ P1 修正：不再建立 inspection_result 初始記錄
     #   理由：量測結果的建立權完全歸屬 App 巡檢員

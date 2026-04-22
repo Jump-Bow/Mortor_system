@@ -256,7 +256,7 @@ def get_inspection_record_details(task_id, **kwargs):
     """
     取得巡檢紀錄詳細資訊 (可鑽取至檢查項目)
     """
-    task = TJob.query.get(task_id)
+    task = TJob.query.filter_by(actid=task_id).first()
     
     if not task:
         return jsonify({
@@ -523,7 +523,7 @@ def get_job_abnormal_items(actid, **kwargs):
     供前端 Modal 顯示使用
     """
     try:
-        job = TJob.query.get(actid)
+        job = TJob.query.filter_by(actid=actid).first()
         if not job:
             return jsonify({'status': 'error', 'message': '工單不存在'}), 404
 
@@ -1252,7 +1252,7 @@ def export_actid_report(actid, **kwargs):
     
     try:
         # Get Job info for the filename
-        job = TJob.query.get(actid)
+        job = TJob.query.filter_by(actid=actid).first()
         if not job:
             return jsonify({'status': 'error', 'message': '找不到該工單'}), 404
             

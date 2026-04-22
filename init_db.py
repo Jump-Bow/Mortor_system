@@ -188,7 +188,7 @@ def init_database():
                         for d in [5, 20]:
                             task_date = get_dynamic_date(month_offset=m_off, day=d)
                             actid = f"JOB-{task_date}-{eq.id}"
-                            if not TJob.query.get(actid):
+                            if not TJob.query.filter_by(actid=actid, equipmentid=eq.id).first():
                                 spec_grade, spec_mterm = random.choice(available_specs)
                                 inspector_id = inspectors[task_count % len(inspectors)]
                                 db.session.add(TJob(

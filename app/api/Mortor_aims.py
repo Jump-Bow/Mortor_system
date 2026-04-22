@@ -245,7 +245,9 @@ def aims_progress_detail(actid, **kwargs):
     取得指定工單下的所有設備及其完成率
     """
     try:
-        job = TJob.query.get_or_404(actid)
+        job = TJob.query.filter_by(actid=actid).first()
+        if not job:
+            return jsonify({'status': 'error', 'message': '工單不存在'}), 404
 
         # 取得該工單的所有設備 (通常一個工單對一個設備，但結構支援多個)
         equipment_list = []
