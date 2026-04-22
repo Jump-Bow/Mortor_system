@@ -442,6 +442,26 @@ def main():
         )
     upsert_dataframe(hr_acc_valid,  "hr_account",      pg_eng)
 
+    # ── 初始化新同步的帳號密碼 ───────────────────────────────────────────────
+    try:
+        from werkzeug.security import generate_password_hash
+        with pg_eng.begin() as conn:
+            # 找出密碼為空的帳號
+            null_pwd_users = conn.execute(sa.text("SELECT id FROM hr_account WHERE password IS NULL OR password = ''")).fetchall()
+            if null_pwd_users:
+                logger.info(f"  hr_account: 發現 {len(null_pwd_users)} 筆帳號無密碼，初始化為員工編號")
+                for row in null_pwd_users:
+                    uid = row[0]
+                    hashed = generate_password_hash(str(uid))
+                    conn.execute(
+                        sa.text("UPDATE hr_account SET password = :pwd WHERE id = :uid"),
+                        {"pwd": hashed, "uid": uid}
+                    )
+                logger.info("  ✅ hr_account 密碼初始化完成")
+    except Exception as e:
+        logger.error(f"  ❌ hr_account 密碼初始化失敗: {e}")
+
+
     # ── NOT NULL 防護：t_job.mdate 不可為 null ────────────────────────────────
     # PostgreSQL t_job.mdate 定義為 nullable=False，
     # 但 Oracle AIMS 存在 mdate=NULL 的工單（未排定日期），需在此過濾。
