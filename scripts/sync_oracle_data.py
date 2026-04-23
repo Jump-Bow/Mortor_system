@@ -415,16 +415,22 @@ def main():
     # 外鍵依賴順序：組織/人員 → 設備 → 工單
     upsert_dataframe(org,           "t_organization",  pg_eng)
 
-    # ── ForeignKeyViolation 防護：t_equipment → t_organization ───────────────
+    # ── ForeignKeyViolation 診斷：t_equipment → t_organization ───────────────
+    # ▶ 配合 t_job 孤兒診斷需求，改為保留全部設備（unitid 無效者設為 NULL）
+    # ▶ 確保 t_job 的孤兒工單能順利寫入（FK 依賴設備存在）
     valid_torg_ids = set(org["unitid"].dropna().astype(str))
-    equip_valid = equip[equip["unitid"].astype(str).isin(valid_torg_ids)].copy()
-    equip_orphan_count = len(equip) - len(equip_valid)
+    equip_all = equip.copy()
+    equip_orphan_mask = ~equip_all["unitid"].astype(str).isin(valid_torg_ids)
+    equip_orphan_count = equip_orphan_mask.sum()
     if equip_orphan_count > 0:
+        equip_all.loc[equip_orphan_mask, "unitid"] = None
         logger.warning(
-            f"  ⚠️  t_equipment: 略過 {equip_orphan_count} 筆孤兒紀錄"
-            f"（unitid 未出現在 t_organization，FK 防護）"
+            f"  ⚠️  t_equipment: {equip_orphan_count} 筆設備 unitid 無效"
+            f"（未出現在 t_organization），已設為 NULL 保留設備（供 t_job FK 診斷使用）"
         )
-    upsert_dataframe(equip_valid,   "t_equipment",     pg_eng)
+    equip_valid = equip_all  # 供後續 t_job 孤兒診斷使用（valid_equip_ids 判斷）
+    upsert_dataframe(equip_all, "t_equipment", pg_eng)
+
     
     upsert_dataframe(hr_org,        "hr_organization", pg_eng)
 
@@ -459,20 +465,25 @@ def main():
             f"（Oracle 未排定日期，不符合 NOT NULL 約束）"
         )
 
-    # ── ForeignKeyViolation 防護：t_job → t_equipment ────────────────────────
-    # t_job.equipmentid 受 FK 約束，若對應設備因 t_organization 孤兒而被過濾，
-    # 相關工單也必須一併排除，否則寫入時 PG 會報 FK 錯誤。
+    # ── ForeignKeyViolation 診斷：t_job → t_equipment ────────────────────────
+    # ▶ 依使用者要求，暫時解除孤兒過濾：全數工單寫入資料庫。
+    # ▶ 改為 LOG 模式：列出所有 equipmentid 不在 t_equipment 的孤兒工單供反查。
     valid_equip_ids = set(equip_valid["id"].dropna().astype(str))
-    jobs_equip_valid = jobs_valid[jobs_valid["equipmentid"].astype(str).isin(valid_equip_ids)].copy()
-    equip_job_orphan_count = len(jobs_valid) - len(jobs_equip_valid)
-    if equip_job_orphan_count > 0:
+    orphan_jobs_mask = ~jobs_valid["equipmentid"].astype(str).isin(valid_equip_ids)
+    orphan_jobs_df = jobs_valid[orphan_jobs_mask]
+    if not orphan_jobs_df.empty:
         logger.warning(
-            f"  ⚠️  t_job: 略過 {equip_job_orphan_count} 筆孤兒工單"
-            f"（equipmentid 未出現在 t_equipment，FK 防護）"
+            f"  ⚠️  t_job: 發現 {len(orphan_jobs_df)} 筆孤兒工單（equipmentid 不在 t_equipment）"
+            f"，仍強制寫入，請反查下列 equipmentid："
         )
-    upsert_dataframe(jobs_equip_valid, "t_job", pg_eng)
+        for _, row in orphan_jobs_df.iterrows():
+            logger.warning(
+                f"      孤兒工單 actid={row['actid']} equipmentid={row['equipmentid']}"
+            )
+    upsert_dataframe(jobs_valid, "t_job", pg_eng)   # ← 改用 jobs_valid（全量），不再過濾孤兒
     # inspection_result：不同步（量測結果僅由 App 巡檢員產生）
     # abnormal_cases  ：不同步（純 FEM 業務資料，Oracle AIMS 不存在此概念）
+
 
     logger.info("=" * 60)
     logger.info("🏁 主要同步作業完成（t_job 已寫入）")
