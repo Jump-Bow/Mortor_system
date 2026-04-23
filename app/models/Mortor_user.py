@@ -52,7 +52,7 @@ class HrAccount(UserMixin, db.Model):
     
     def set_password(self, password: str) -> None:
         """設置密碼 (加密)"""
-        self.password = generate_password_hash(password)
+        self.password = generate_password_hash(password, method='pbkdf2:sha256')
     
     def check_password(self, password: str) -> bool:
         """驗證密碼"""

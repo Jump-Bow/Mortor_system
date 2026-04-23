@@ -84,6 +84,49 @@ def download_tasks(**kwargs):
                 'is_required': True
             })
 
+        # ── 懶惰式預建 inspection_result（Lazy Initialization）────────────────
+        # 第一性原理：「量測紀錄的骨架必須由系統提前準備好，
+        # 巡檢員的工作是填寫值，而不是建立紀錄。」
+        #
+        # 當 APP 下載工單時，Server 自動確保每個 check_item 都有一筆
+        # is_out_of_spec=CREATED(0) 的佔位紀錄。
+        # APP 提交量測值時，只需 UPDATE 這筆紀錄即可，而不需要 INSERT。
+        #
+        # 優點：避免了「APP 必須自己決定 INSERT 還是 UPDATE」的複雜性。
+        # 安全：使用 INSERT ... ON CONFLICT DO NOTHING，不會覆蓋已填寫的資料。
+        if check_items_objs:
+            from app.models.Mortor_inspection import InspectionResult
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            existing_ids = {
+                r.item_id
+                for r in task.results.with_entities(InspectionResult.item_id).all()
+            }
+            new_records = []
+            for item in check_items_objs:
+                if item.item_id not in existing_ids:
+                    new_records.append({
+                        'actid': task.actid,
+                        'equipmentid': task.equipmentid,
+                        'item_id': item.item_id,
+                        'is_out_of_spec': int(InspectionStatus.CREATED),
+                    })
+
+            if new_records:
+                try:
+                    stmt = pg_insert(InspectionResult).values(new_records)
+                    stmt = stmt.on_conflict_do_nothing()
+                    db.session.execute(stmt)
+                    db.session.commit()
+                    current_app.logger.info(
+                        f"[LazyInit] 工單 {task.actid}/{task.equipmentid} "
+                        f"預建 {len(new_records)} 筆 inspection_result"
+                    )
+                except Exception as e:
+                    db.session.rollback()
+                    current_app.logger.error(f"[LazyInit] 預建 inspection_result 失敗: {e}")
+        # ─────────────────────────────────────────────────────────────────────
+
         total_items = len(check_items)
         completed_items = 0
 
@@ -114,6 +157,7 @@ def download_tasks(**kwargs):
             'unitname': equipment.facility.unitname if equipment and equipment.facility else None,
             'equipment_check_items': check_items
         })
+
 
     # ── 稽核日誌（僅已登入才記錄） ────────────────────────────────────────────
     if current_user:
@@ -160,7 +204,8 @@ def download_tasks(**kwargs):
             'hr_accounts': hr_accounts_data,
             'last_sync': datetime.utcnow().isoformat() + 'Z',
             'total_count': len(tasks),
-            'synced_at': datetime.utcnow().isoformat() + 'Z'
+            'synced_at': datetime.utcnow().isoformat() + 'Z',
+            'hr_accounts': hr_accounts_data,
         }
     }), 200
 
