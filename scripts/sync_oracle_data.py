@@ -431,16 +431,21 @@ def main():
     # ── ForeignKeyViolation 防護：hr_account → hr_organization ───────────────
     # hr_account.organizationid 受 FK 約束，若 Oracle 來源有孤兒紀錄
     # （organizationid 不存在於 hr_organization），寫入時 PG 會報 FK 錯誤。
-    # 解法：以 hr_org 實際同步成功的 id 集合做白名單過濾。
+    # ▶ 修正策略：不過濾整筆帳號（會導致 AD 登入找不到使用者），
+    #            改為將無效的 organizationid 設為 None（NULL），保留帳號本身。
+    # ▶ 原因：人員帳號的存在性（id）優先於組織歸屬欄位，
+    #         少了部門資訊系統仍可運作，但整筆帳號消失會造成 AD 登入失敗。
     valid_org_ids = set(hr_org["id"].dropna().astype(str))
-    hr_acc_valid  = hr_acc[hr_acc["organizationid"].astype(str).isin(valid_org_ids)].copy()
-    orphan_count  = len(hr_acc) - len(hr_acc_valid)
+    hr_acc_valid = hr_acc.copy()
+    orphan_mask = ~hr_acc_valid["organizationid"].astype(str).isin(valid_org_ids)
+    orphan_count = orphan_mask.sum()
     if orphan_count > 0:
+        hr_acc_valid.loc[orphan_mask, "organizationid"] = None
         logger.warning(
-            f"  ⚠️  hr_account: 略過 {orphan_count} 筆孤兒紀錄"
-            f"（organizationid 未出現在 hr_organization，FK 防護）"
+            f"  ⚠️  hr_account: {orphan_count} 筆帳號 organizationid 無效"
+            f"（未出現在 hr_organization），已設為 NULL 保留帳號（AD 登入保護）"
         )
-    upsert_dataframe(hr_acc_valid,  "hr_account",      pg_eng)
+    upsert_dataframe(hr_acc_valid, "hr_account", pg_eng)
 
     # ── 初始化新同步的帳號密碼 ───────────────────────────────────────────────
     try:

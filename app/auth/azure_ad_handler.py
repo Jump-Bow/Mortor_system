@@ -88,17 +88,18 @@ class AzureADHandler:
     @staticmethod
     def get_username_from_token(result: Dict) -> Optional[str]:
         """
-        從 MSAL token 結果中提取使用者帳號
+        從 MSAL token 結果中提取使用者完整帳號（preferred_username）
 
-        優先順序:
-        1. preferred_username (通常為 AD 帳號，如 user@domain.com)
-        2. 取 @ 前面的部分作為帳號 (如 user)
+        回傳完整的 preferred_username（如 user@chimei.com.tw）供外部以
+        hr_account.email 欄位做 case-insensitive 查詢。
+
+        ▶ 不再截斷 @ 前半段：因為 hr_account.id 存的是員工編號（如 92298）而非 AD 帳號字串。
 
         Args:
             result: MSAL acquire_token 回傳的結果
 
         Returns:
-            使用者帳號 (對應 hr_account.id)，或 None
+            使用者完整 AD 帳號（preferred_username），或 None
         """
         claims = result.get('id_token_claims', {})
 
@@ -109,11 +110,10 @@ class AzureADHandler:
             current_app.logger.warning('Azure AD token 中未包含 preferred_username')
             return None
 
-        # 取 @ 前面的部分作為帳號 (如 user@chimei.com → user)
-        username = preferred_username.split('@')[0] if '@' in preferred_username else preferred_username
-
-        current_app.logger.info(f'Azure AD 認證成功, preferred_username={preferred_username}, mapped_id={username}')
-        return username
+        current_app.logger.info(
+            f'Azure AD 認證成功, preferred_username={preferred_username}'
+        )
+        return preferred_username
 
     @staticmethod
     def get_user_info_from_token(result: Dict) -> Dict:

@@ -80,15 +80,20 @@ def azure_callback():
     if token_error:
         return redirect(url_for('web.login', azure_error=token_error))
 
-    # 從 token 提取使用者帳號
-    username = AzureADHandler.get_username_from_token(result)
-    if not username:
+    # 從 token 提取使用者帳號（preferred_username，如 CHUNGPAO_WENG@mail.chimei.com.tw）
+    preferred_username = AzureADHandler.get_username_from_token(result)
+    if not preferred_username:
         return redirect(url_for('web.login', azure_error='Azure AD 認證失敗：無法取得使用者帳號'))
 
-    # 以帳號查詢資料庫
-    user = HrAccount.query.filter_by(id=username).first()
+    # ▶ hr_account.id 存的是員工編號（如 92298），不是 AD 帳號字串。
+    # ▶ 必須透過 email 欄位（存 AD 完整帳號）做 case-insensitive 查詢。
+    user = HrAccount.query.filter(
+        HrAccount.email.ilike(preferred_username)
+    ).first()
     if not user:
-        current_app.logger.warning(f'Azure AD user not found in database: {username}')
+        current_app.logger.warning(
+            f'Azure AD user not found in database by email: {preferred_username}'
+        )
         return redirect(url_for('web.login', azure_error='此帳號未授權使用本系統'))
 
     # 產生本系統 JWT Token
@@ -248,11 +253,13 @@ def login():
             current_app.logger.warning(f'Azure AD ROPC failed for {upn}: {ad_error}')
             return jsonify({'status': 'error', 'message': '帳號或密碼錯誤（AD）'}), 401
 
-        # 以員工編號（不含 domain）查詢本地資料庫
-        employee_id = ad_username.split('@')[0]
-        user = HrAccount.query.filter_by(id=employee_id).first()
+        # ▶ hr_account.id 存的是員工編號，不是 AD 帳號字串。
+        # ▶ 必須透過 email 欄位（存完整 AD UPN）做 case-insensitive 查詢。
+        user = HrAccount.query.filter(
+            HrAccount.email.ilike(upn)
+        ).first()
         if not user:
-            current_app.logger.warning(f'Azure AD user not found in hr_account: {employee_id}')
+            current_app.logger.warning(f'Azure AD ROPC user not found in hr_account by email: {upn}')
             return jsonify({'status': 'error', 'message': '此帳號未授權使用本系統，請聯絡管理員'}), 403
 
     else:
