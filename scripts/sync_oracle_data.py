@@ -447,25 +447,6 @@ def main():
         )
     upsert_dataframe(hr_acc_valid, "hr_account", pg_eng)
 
-    # ── 初始化新同步的帳號密碼 ───────────────────────────────────────────────
-    try:
-        from werkzeug.security import generate_password_hash
-        with pg_eng.begin() as conn:
-            # 找出密碼為空的帳號
-            null_pwd_users = conn.execute(sa.text("SELECT id FROM hr_account WHERE password IS NULL OR password = ''")).fetchall()
-            if null_pwd_users:
-                logger.info(f"  hr_account: 發現 {len(null_pwd_users)} 筆帳號無密碼，初始化為員工編號")
-                for row in null_pwd_users:
-                    uid = row[0]
-                    hashed = generate_password_hash(str(uid), method='pbkdf2:sha256')
-                    conn.execute(
-                        sa.text("UPDATE hr_account SET password = :pwd WHERE id = :uid"),
-                        {"pwd": hashed, "uid": uid}
-                    )
-                logger.info("  ✅ hr_account 密碼初始化完成")
-    except Exception as e:
-        logger.error(f"  ❌ hr_account 密碼初始化失敗: {e}")
-
 
     # ── NOT NULL 防護：t_job.mdate 不可為 null ────────────────────────────────
     # PostgreSQL t_job.mdate 定義為 nullable=False，
@@ -494,7 +475,36 @@ def main():
     # abnormal_cases  ：不同步（純 FEM 業務資料，Oracle AIMS 不存在此概念）
 
     logger.info("=" * 60)
-    logger.info("🏁 同步作業完成")
+    logger.info("🏁 主要同步作業完成（t_job 已寫入）")
+    logger.info("=" * 60)
+
+    # ── 初始化無密碼帳號（收尾工作，不影響主資料）────────────────────────────
+    # ▶ 此區塊放在 t_job 之後：避免長時間 hash 計算 block 導致 t_job 超時未寫入。
+    # ▶ 改為每筆獨立 commit：避免單一大 transaction 持鎖導致整批 rollback。
+    try:
+        from werkzeug.security import generate_password_hash
+        with pg_eng.connect() as conn:
+            null_pwd_users = conn.execute(
+                sa.text("SELECT id FROM hr_account WHERE password IS NULL OR password = ''")
+            ).fetchall()
+        if null_pwd_users:
+            logger.info(f"  hr_account: 發現 {len(null_pwd_users)} 筆帳號無密碼，開始初始化...")
+            for row in null_pwd_users:
+                uid = row[0]
+                hashed = generate_password_hash(str(uid), method='pbkdf2:sha256')
+                with pg_eng.begin() as conn:  # 每筆獨立 transaction，避免超時整批 rollback
+                    conn.execute(
+                        sa.text("UPDATE hr_account SET password = :pwd WHERE id = :uid"),
+                        {"pwd": hashed, "uid": uid}
+                    )
+            logger.info(f"  ✅ hr_account 密碼初始化完成（{len(null_pwd_users)} 筆）")
+        else:
+            logger.info("  hr_account: 全部帳號已有密碼，跳過初始化")
+    except Exception as e:
+        logger.error(f"  ❌ hr_account 密碼初始化失敗: {e}")
+
+    logger.info("=" * 60)
+    logger.info("🏁 所有工作完成")
     logger.info("=" * 60)
 
 
