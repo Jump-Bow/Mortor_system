@@ -76,6 +76,24 @@
             </div>
         </div>
 
+        <div class="card" id="subFacilityCard" style="display: none;">
+            <div class="card-header">
+                <h3 class="card-title">子設施列表</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-hover" id="subFacilityTable">
+                    <thead>
+                        <tr>
+                            <th>設施名稱</th>
+                            <th>設施類型</th>
+                            <th>設備數量</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="card" id="equipmentCard" style="display: none;">
             <div class="card-header">
                 <h3 class="card-title">關聯設備</h3>
@@ -201,6 +219,7 @@
         $('#facilityDetailContent').show();
         $('#action-buttons').show();
         $('#equipmentCard').show();
+        $('#subFacilityCard').show();
 
         $('#detail-name').text(data.unitname);
         $('#detail-type').html('<span class="badge badge-info">' + data.unittype + '</span>');
@@ -212,18 +231,50 @@
 
         // Load equipment for this facility
         loadEquipment(data.unitid);
+        
+        // Load sub-facilities for this facility
+        loadSubFacilities(data.unitid);
+    }
+
+    function loadSubFacilities(facilityId) {
+        const tbody = $('#subFacilityTable tbody');
+        tbody.empty();
+        tbody.append('<tr><td colspan="3" class="text-center">載入中...</td></tr>');
+
+        $.ajax({
+            url: '/api/v1/facilities?parent_id=' + facilityId,
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + apiToken },
+            success: function (response) {
+                tbody.empty();
+                if (response.status === 'success' && response.data.facilities && response.data.facilities.length > 0) {
+                    response.data.facilities.forEach(fac => {
+                        const equipCount = fac.equipment ? fac.equipment.length : 0;
+                        tbody.append(`
+                        <tr>
+                            <td>${fac.unitname}</td>
+                            <td><span class="badge badge-info">${fac.unittype || '-'}</span></td>
+                            <td>${equipCount} 台</td>
+                        </tr>
+                    `);
+                    });
+                } else {
+                    tbody.append('<tr><td colspan="3" class="text-center text-muted">無子設施</td></tr>');
+                }
+            },
+            error: function () {
+                tbody.html('<tr><td colspan="3" class="text-center text-danger">載入失敗</td></tr>');
+            }
+        });
     }
 
     function loadEquipment(facilityId) {
-        // Placeholder for equipment loading logic
-        // Assuming there might be an endpoint or we use the facility detail endpoint which includes equipment
-        // For now, clear table
         const tbody = $('#equipmentTable tbody');
         tbody.empty();
         tbody.append('<tr><td colspan="4" class="text-center">載入中...</td></tr>');
 
         $.ajax({
-            url: '/api/v1/facilities/' + facilityId,
+            url: '/api/v1/facilities/' + facilityId + '/equipment',
             method: 'GET',
             headers: { 'Authorization': 'Bearer ' + apiToken },
             success: function (response) {

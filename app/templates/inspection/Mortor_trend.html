@@ -1,8 +1,8 @@
-﻿{% extends "layout/Mortor_base.html" %}
+{% extends "layout/Mortor_base.html" %}
 
-{% block title %}抄表趨勢圖(設備) - 設備保養管理系統{% endblock %}
-{% block page_title %}抄表趨勢圖(設備){% endblock %}
-{% block breadcrumb_active %}抄表趨勢圖{% endblock %}
+{% block title %}設備趨勢圖 - 設備保養管理系統{% endblock %}
+{% block page_title %}設備趨勢圖{% endblock %}
+{% block breadcrumb_active %}設備趨勢圖{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -221,20 +221,28 @@
         if (currentEquipId) selectEquipment(currentEquipId, currentEquipName);
     }
 
+    let orgOrder = [];
+
     /* ===== 載入設備清單（依組織分群） ===== */
     function loadEquipments() {
-        $.ajax({
-            url: '/api/v1/facilities/equipment/all',
-            method: 'GET',
-            success: function (response) {
-                if (response.status === 'success') {
-                    allEquipments = response.data.equipment || [];
-                    renderEquipList(allEquipments);
-                }
-            },
-            error: function () {
-                $('#equip-list').html('<div class="text-center text-danger py-3">載入失敗</div>');
+        $.when(
+            $.ajax('/api/v1/organizations/tree'),
+            $.ajax('/api/v1/facilities/equipment/all')
+        ).done(function(orgRes, eqRes) {
+            if(orgRes[0].status === 'success') {
+                const tree = orgRes[0].data.organizations || [];
+                const flattenOrg = (node) => {
+                    if (node.unitname) orgOrder.push(node.unitname);
+                    if (node.children) node.children.forEach(flattenOrg);
+                };
+                tree.forEach(flattenOrg);
             }
+            if(eqRes[0].status === 'success') {
+                allEquipments = eqRes[0].data.equipment || [];
+                renderEquipList(allEquipments);
+            }
+        }).fail(function() {
+            $('#equip-list').html('<div class="text-center text-danger py-3">載入失敗</div>');
         });
     }
 
@@ -255,17 +263,29 @@
             groups[key].push(e);
         });
 
-        Object.keys(groups).forEach(function (orgName) {
+        // 依據 orgOrder 排序 key
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === '未分類') return 1;
+            if (b === '未分類') return -1;
+            const idxA = orgOrder.indexOf(a);
+            const idxB = orgOrder.indexOf(b);
+            if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+            if (idxA === -1) return 1;
+            if (idxB === -1) return -1;
+            return idxA - idxB;
+        });
+
+        sortedKeys.forEach(function (orgName) {
             const groupId = 'grp_' + orgName.replace(/\s/g, '_');
-            // 群組標題
+            // 群組標題 (預設折疊)
             list.append(`
-                <div class="equip-group-header" onclick="toggleGroup('${groupId}', this)">
+                <div class="equip-group-header collapsed" onclick="toggleGroup('${groupId}', this)">
                     <i class="fas fa-chevron-down toggle-icon"></i>
                     <i class="fas fa-building org-icon"></i>
                     ${orgName}
                     <span class="badge badge-secondary ml-auto">${groups[orgName].length}</span>
                 </div>
-                <div id="${groupId}" class="equip-group-items">
+                <div id="${groupId}" class="equip-group-items" style="display:none;">
                 </div>
             `);
             const groupDiv = $(`#${groupId}`);

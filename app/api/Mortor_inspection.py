@@ -693,13 +693,45 @@ def query_equipment_trend(equipmentid, **kwargs):
     try:
         from app.models.Mortor_equipment import EquitCheckItem
 
-        # 取得所有通用檢查項目 (不再綁定特定設備)
-        check_items = EquitCheckItem.query.all()
-
+        # 取得這台設備的最新工單，以推斷應有的檢查項目
+        latest_job = TJob.query.filter_by(equipmentid=equipmentid).order_by(TJob.mdate.desc()).first()
+        valid_check_items = []
+        if latest_job:
+            valid_check_items = EquitCheckItem.query.filter_by(grade=latest_job.grade, mterm=latest_job.mterm).all()
+            
+        # 取得所有通用檢查項目做 dict 查詢
+        all_check_items = EquitCheckItem.query.all()
+        item_dict = {item.item_id: item for item in all_check_items}
+        
         # 取得歷史量測結果
         results = InspectionResult.query.filter_by(
             equipmentid=equipmentid
         ).order_by(InspectionResult.act_time.asc()).all()
+
+        # 整理 unique items (先加最新工單的應有項目)
+        unique_items = {}
+        for item in valid_check_items:
+            unique_items[item.item_name] = {
+                'item_name': item.item_name,
+                'unit': item.unit,
+                'max_v': float(item.max_v) if item.max_v else None,
+                'min_v': float(item.min_v) if item.min_v else None,
+                'item_ids': {item.item_id}
+            }
+            
+        # 將歷史上確實量測過的也加入
+        for r in results:
+            if r.item_id in item_dict:
+                item = item_dict[r.item_id]
+                if item.item_name not in unique_items:
+                    unique_items[item.item_name] = {
+                        'item_name': item.item_name,
+                        'unit': item.unit,
+                        'max_v': float(item.max_v) if item.max_v else None,
+                        'min_v': float(item.min_v) if item.min_v else None,
+                        'item_ids': set()
+                    }
+                unique_items[item.item_name]['item_ids'].add(r.item_id)
 
         # 整理時間軸
         dates = []
@@ -713,35 +745,34 @@ def query_equipment_trend(equipmentid, **kwargs):
 
         # 整理每個檢查項目的歷史數據
         items_data = []
-        for item in check_items:
-            item_results = [r for r in results if r.item_id == item.item_id]
+        for item_name, info in unique_items.items():
+            item_results = [r for r in results if r.item_id in info['item_ids']]
             values = []
             for d in dates:
-                # 找到該日期的量測值
                 val = None
                 for r in item_results:
                     if r.act_time and r.act_time.strftime('%Y-%m-%d') == d:
                         try:
                             val = float(r.measured_value) if r.measured_value else None
                         except (ValueError, TypeError):
-                            val = None
+                            pass
                         break
                 values.append(val)
-
+            
             items_data.append({
-                'item_name': item.item_name,
-                'unit': item.unit,
-                'max_v': float(item.max_v) if item.max_v else None,
-                'min_v': float(item.min_v) if item.min_v else None,
+                'item_name': info['item_name'],
+                'unit': info['unit'],
+                'max_v': info['max_v'],
+                'min_v': info['min_v'],
                 'values': values
             })
 
         # 上下限
         limits = {}
-        if check_items:
+        if valid_check_items:
             limits = {
-                'max_v': check_items[0].max_v,
-                'min_v': check_items[0].min_v
+                'max_v': valid_check_items[0].max_v,
+                'min_v': valid_check_items[0].min_v
             }
 
         # 明細記錄
@@ -1102,13 +1133,18 @@ def get_comparison_item_tree(**kwargs):
                 }
 
         # 依 unit 分類
-        UNIT_CATEGORY = {
-            'mm/s': '馬達-振動',
-            '℃':    '馬達-溫度',
-        }
         categories = {}
         for info in seen.values():
-            cat = UNIT_CATEGORY.get(info['unit'], '其他')
+            unit_str = (info['unit'] or '').strip()
+            item_name_str = (info['item_name'] or '').strip()
+            
+            if '℃' in unit_str or 'C' in unit_str or '溫度' in item_name_str:
+                cat = '馬達-溫度'
+            elif 'mm' in unit_str or '振動' in item_name_str or '震動' in item_name_str:
+                cat = '馬達-振動'
+            else:
+                cat = '其他'
+
             if cat not in categories:
                 categories[cat] = {'name': cat, 'unit': info['unit'], 'items': []}
             categories[cat]['items'].append(info)
@@ -1161,31 +1197,17 @@ def get_comparison_equip_trend(**kwargs):
             if not equip:
                 continue
 
-            # 找到此設備的工單對應的 item（根據 grade/mterm）
-            from app.models.Mortor_inspection import TJob
-            job = TJob.query.filter_by(equipmentid=eid).first()
-            grade = job.grade if job else None
-            mterm = job.mterm if job else None
-
-            # 找到符合的 EquitCheckItem
-            item_q = EquitCheckItem.query.filter_by(item_name=item_name)
-            if grade:
-                item_q = item_q.filter_by(grade=grade)
-            if mterm:
-                item_q = item_q.filter_by(mterm=mterm)
-            check_item = item_q.first()
-
-            if not check_item:
-                # 退而求其次：只用 item_name 找
-                check_item = EquitCheckItem.query.filter_by(item_name=item_name).first()
-
-            if not check_item:
+            # 找到所有同名的 item_id (因為同一檢查項目在不同保養週期可能會有不同的 item_id)
+            all_items = EquitCheckItem.query.filter_by(item_name=item_name).all()
+            matching_item_ids = [i.item_id for i in all_items]
+            
+            if not matching_item_ids:
                 continue
 
             # 查 InspectionResult
-            rq = InspectionResult.query.filter_by(
-                equipmentid=eid,
-                item_id=check_item.item_id
+            rq = InspectionResult.query.filter(
+                InspectionResult.equipmentid == eid,
+                InspectionResult.item_id.in_(matching_item_ids)
             ).order_by(InspectionResult.act_time.asc())
 
             if start_date:

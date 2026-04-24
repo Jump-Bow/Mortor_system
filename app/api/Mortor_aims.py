@@ -4,7 +4,7 @@ AIMS工單執行進度查詢 API
 """
 from flask import Blueprint, request, jsonify, current_app
 from app.models.Mortor_inspection import TJob, InspectionResult
-from app.models.Mortor_equipment import TEquipment
+from app.models.Mortor_equipment import TEquipment, EquitCheckItem
 from app.models.Mortor_abnormal import AbnormalCases
 from app.api.Mortor_inspection import get_descendant_unit_ids
 from app.auth.jwt_handler import token_required
@@ -295,39 +295,75 @@ def aims_progress_detail(actid, **kwargs):
 def aims_equipment_measurements(actid, equipmentid, **kwargs):
     """
     AIMS設備量測資訊
-    取得指定工單下指定設備的所有量測結果
+    【修正版】以 equit_check_item 為主體，LEFT JOIN inspection_result。
+    不論巡檢員是否已量測、LazyInit 是否執行過，
+    所有設備都能顯示完整的檢查項目清單（未量測欄位顯示 -）。
     """
     try:
-        results = InspectionResult.query.filter_by(
+        # 1. 先取得該工單對應的 grade/mterm，以查詢通用檢查項目
+        job = TJob.query.filter_by(actid=actid, equipmentid=equipmentid).first()
+        if not job:
+            return jsonify({'status': 'error', 'message': '找不到對應工單'}), 404
+
+        # 2. 查詢該 grade/mterm 的所有檢查項目（排序輸出）
+        check_items = EquitCheckItem.query.filter_by(
+            grade=job.grade, mterm=job.mterm
+        ).order_by(EquitCheckItem.sort_order).all()
+
+        # 3. 查詢已有的量測結果，建立 item_id → result 快取
+        existing_results = InspectionResult.query.filter_by(
             actid=actid, equipmentid=equipmentid
         ).all()
+        result_map = {r.item_id: r for r in existing_results}
 
+        # 4. 查詢異常記錄，建立 item_id → abnormal 快取
+        abnormal_map = {}
+        if existing_results:
+            item_ids = [r.item_id for r in existing_results]
+            abnormal_cases = AbnormalCases.query.filter(
+                AbnormalCases.actid == actid,
+                AbnormalCases.item_id.in_(item_ids)
+            ).all()
+            abnormal_map = {a.item_id: a for a in abnormal_cases}
+
+        # 5. 以 check_item 為主體組合輸出（LEFT JOIN 語意）
         measurements = []
-        for result in results:
-            result_dict = result.to_dict()
-            # 加入檢查項目的上下限警戒值
-            if result.check_item:
-                result_dict['max_v'] = result.check_item.max_v
-                result_dict['min_v'] = result.check_item.min_v
-                result_dict['unit'] = result.check_item.unit
-                result_dict['status_type'] = result.check_item.status_type
-            # 加入異常追蹤資料（abn_msg / abn_solution / processed_memname）
-            abnormal = AbnormalCases.query.filter_by(
-                actid=actid, item_id=result.item_id
-            ).first()
-            if abnormal:
-                result_dict['abn_msg'] = abnormal.abn_msg
-                result_dict['abn_solution'] = abnormal.abn_solution
-                result_dict['is_processed'] = abnormal.is_processed
-                result_dict['processed_memname'] = (
+        for item in check_items:
+            result = result_map.get(item.item_id)
+            abnormal = abnormal_map.get(item.item_id)
+
+            # 判斷是否已量測（is_out_of_spec != 0 表示已填寫）
+            is_measured = result is not None and result.is_out_of_spec != 0
+            is_abnormal = result is not None and result.is_out_of_spec > 0
+
+            measurements.append({
+                # ── 識別欄位 ──
+                'actid':          actid,
+                'item_id':        item.item_id,
+                'equipmentid':    equipmentid,
+                # ── 檢查項目模板（永遠有值）──
+                'item_name':      item.item_name,
+                'max_v':          item.max_v,
+                'min_v':          item.min_v,
+                'unit':           item.unit,
+                'status_type':    item.status_type,
+                # ── 量測結果（未量測則 None）──
+                'measured_value': result.measured_value if result else None,
+                'act_time':       result.act_time.strftime('%Y-%m-%d %H:%M:%S') if result and result.act_time else None,
+                'result_photo':   result.result_photo if result else None,
+                'is_out_of_spec': result.is_out_of_spec if result else 0,
+                'is_measured':    is_measured,
+                'is_abnormal':    is_abnormal,
+                # ── 異常追蹤（未異常則 None）──
+                'abn_msg':             abnormal.abn_msg if abnormal else None,
+                'abn_solution':        abnormal.abn_solution if abnormal else None,
+                'is_processed':        (1 if abnormal.is_processed else 0) if abnormal else 0,
+                'processed_memname':   (
                     abnormal.responsible_user.name
-                    if abnormal.responsible_user else abnormal.processed_memid
-                )
-            else:
-                result_dict['abn_msg'] = None
-                result_dict['abn_solution'] = None
-                result_dict['processed_memname'] = None
-            measurements.append(result_dict)
+                    if abnormal and abnormal.responsible_user
+                    else (abnormal.processed_memid if abnormal else None)
+                ),
+            })
 
         return jsonify({
             'status': 'success',

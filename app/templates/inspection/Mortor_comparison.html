@@ -1,4 +1,4 @@
-﻿{% extends "layout/Mortor_base.html" %}
+{% extends "layout/Mortor_base.html" %}
 
 {% block title %}同性質設備趨勢比較 - 設備保養管理系統{% endblock %}
 {% block page_title %}同性質設備趨勢比較{% endblock %}
@@ -201,6 +201,8 @@
         '#3B82F6','#EF4444','#F59E0B','#84CC16','#6366F1'
     ];
 
+    let orgOrder = [];
+
     /* ===== 初始化 ===== */
     $(document).ready(function () {
         const today = new Date();
@@ -208,6 +210,20 @@
         past.setDate(today.getDate() - 90);
         $('#date-to').val(today.toISOString().split('T')[0]);
         $('#date-from').val(past.toISOString().split('T')[0]);
+
+        // 預先取得組織架構，用於後續設備排序
+        $.ajax({
+            url: '/api/v1/organizations/tree',
+            success: function(res) {
+                if(res.status === 'success') {
+                    const flattenOrg = (node) => {
+                        if (node.unitname) orgOrder.push(node.unitname);
+                        if (node.children) node.children.forEach(flattenOrg);
+                    };
+                    (res.data.organizations || []).forEach(flattenOrg);
+                }
+            }
+        });
 
         loadItemTree();
         $('#tree-search').on('input', filterTree);
@@ -306,7 +322,7 @@
         const tbody = $('#equip-tbody');
         tbody.html('<tr><td colspan="6" class="text-center"><i class="fas fa-spinner fa-spin"></i> 載入中...</td></tr>');
 
-        // 先取所有設備，再取 comparison 舊 API 獲取有記錄的設備 id 集合
+        // 先取所有設備，然後依照組織樹進行分群折疊
         $.ajax({
             url: '/api/v1/facilities/equipment/all',
             method: 'GET',
@@ -331,19 +347,56 @@
             return;
         }
 
+        // 依 unitname 分群
+        const groups = {};
         equipments.forEach(function (e) {
+            const key = e.unitname || '未分類';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(e);
+        });
+
+        // 依據 orgOrder 排序
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === '未分類') return 1;
+            if (b === '未分類') return -1;
+            const idxA = orgOrder.indexOf(a);
+            const idxB = orgOrder.indexOf(b);
+            if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+            if (idxA === -1) return 1;
+            if (idxB === -1) return -1;
+            return idxA - idxB;
+        });
+
+        sortedKeys.forEach((orgName, idx) => {
+            const grpId = 'eq_grp_' + idx;
+            const count = groups[orgName].length;
+            
+            // 群組標題列 (預設折疊)
             tbody.append(`
-                <tr>
-                    <td class="check-col">
-                        <input type="checkbox" class="equip-check" value="${e.id}" checked>
+                <tr class="table-secondary" style="cursor:pointer;" onclick="$('.${grpId}').toggle(); $(this).find('.fa-chevron-down, .fa-chevron-right').toggleClass('fa-chevron-down fa-chevron-right');">
+                    <td colspan="6">
+                        <i class="fas fa-chevron-right mr-1"></i>
+                        <strong>${orgName}</strong>
+                        <span class="badge badge-info ml-2">${count} 台</span>
                     </td>
-                    <td><small>${e.unitname || '-'}</small></td>
-                    <td><small>${e.id}</small></td>
-                    <td>${e.name}</td>
-                    <td>-</td>
-                    <td>-</td>
                 </tr>
             `);
+            
+            // 群組內的設備項目 (預設隱藏且取消預設勾選，避免誤傳大量設備)
+            groups[orgName].forEach(e => {
+                tbody.append(`
+                    <tr class="${grpId}" style="display:none;">
+                        <td class="check-col">
+                            <input type="checkbox" class="equip-check" value="${e.id}">
+                        </td>
+                        <td><small>${e.unitname || '-'}</small></td>
+                        <td><small>${e.id}</small></td>
+                        <td>${e.name}</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                `);
+            });
         });
     }
 
